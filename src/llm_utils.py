@@ -60,9 +60,25 @@ def parse_llm_response(response: str) -> List[Dict]:
     """
 
     print(response)
+
+    # Clean the response to ensure it is pure JSON
+    cleaned_response = clean_json_response(response)
+    print("/n/n Here is the cleaned response: ", cleaned_response)
+
     try:
         # Ensure the response is JSON
-        return json.loads(response)
+        return json.loads(cleaned_response)
     except json.JSONDecodeError as e:
         print("Error: LLM response is not valid JSON : {e}")
         return []
+
+def clean_json_response(response_text):
+    """Ensure the response is pure JSON by stripping unwanted prefixes."""
+    response_text = response_text.strip()
+
+    # Remove unwanted prefixes like "json\n"
+    if response_text.startswith("json"):
+        response_text = response_text[4:].strip()
+
+    return response_text
+
