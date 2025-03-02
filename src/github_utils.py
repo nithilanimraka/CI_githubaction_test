@@ -39,12 +39,20 @@ def post_review_comment(comment):
         # Get the actual Commit object using the SHA
         commit = repo.get_commit(head_sha)
 
-        pull_request.create_review_comment(
-            body=comment['body'],
-            commit=commit, # Changed from commit_id to commit
-            path=comment['path'],
-            position=comment['position']
+        # Create draft review with correct parameters
+        review = pull_request.create_review(
+            commit=commit,
+            body="AI Code Review Comments",
+            event="COMMENT"  # Change to "APPROVE" or "REQUEST_CHANGES" if needed
         )
+        
+        # Create review comment with correct parameters
+        review.create_comment(
+            body=comment['body'],
+            path=comment['path'],
+            line=comment['position']  # Changed from 'position' to 'line'
+        )
+        
     except Exception as e:
         print(f"Failed to post comment: {str(e)}")
         print(f"Problematic comment data: {comment}")

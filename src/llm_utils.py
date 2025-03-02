@@ -81,6 +81,7 @@ def parse_llm_response(response: str) -> List[Dict]:
         }
         
         current_section = None
+        
         for line in lines:
             if line.startswith('FILE:'):
                 comment_data['path'] = line.split('FILE:')[1].strip()
