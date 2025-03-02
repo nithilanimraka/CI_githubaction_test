@@ -36,7 +36,7 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
     )   
 
     # Parse and format the response
-    review_comments = parse_llm_response(response)
+    review_comments = parse_llm_response(response.text)
     return review_comments
 
 def parse_llm_response(response: str) -> List[Dict]:
