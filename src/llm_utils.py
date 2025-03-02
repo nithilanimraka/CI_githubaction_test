@@ -63,4 +63,4 @@ def parse_llm_response(response: str) -> List[Dict]:
         return json.loads(response)
     except json.JSONDecodeError as e:
         print("Error: LLM response is not valid JSON : {e}")
-        return None
+        return []
