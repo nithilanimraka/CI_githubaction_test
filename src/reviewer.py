@@ -8,15 +8,22 @@ class AICodeReviewer:
         self.github_token = os.getenv('GIT_TOKEN')
 
     def review_pull_request(self):
-        # Get the PR diff
-        diff_content = get_pull_request_diff()
+        try:
+            # Get the PR diff
+            diff_content = get_pull_request_diff()
 
-        # Analyze changes using LLM
-        review_comments = analyze_code_changes(diff_content)
+            # Analyze changes using LLM
+            review_comments = analyze_code_changes(diff_content)
 
-        # Post comments back to GitHub
-        for comment in review_comments:
-            post_review_comment(comment)
+            # Post all comments in a single batch
+            if review_comments:
+                post_review_comment(review_comments)
+            else:
+                print("No review comments generated")
+                
+        except Exception as e:
+            print(f"Review failed: {str(e)}")
+            raise
 
 if __name__ == '__main__':
     reviewer = AICodeReviewer()

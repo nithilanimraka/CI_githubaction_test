@@ -21,8 +21,8 @@ def get_pull_request_diff():
     response = requests.get(diff_url)
     return response.text
 
-def post_review_comment(comment):
-    """Post a review comment back to the pull request"""
+def post_review_comment(comments):
+    """Post all review comments at once"""
     g = Github(os.getenv('GIT_TOKEN'))
 
     event_path = os.getenv('GITHUB_EVENT_PATH')
@@ -34,25 +34,27 @@ def post_review_comment(comment):
     pull_request = repo.get_pull(pr_number)
     head_sha = event_data['pull_request']['head']['sha']
 
-    #Create review comment
-    try:
-        # Get the actual Commit object using the SHA
-        commit = repo.get_commit(head_sha)
+    # Prepare review comments in GitHub's required format
+    github_comments = []
+    for comment in comments:
+        try:
+            github_comments.append({
+                "path": comment['path'],
+                "body": comment['body'],
+                "line": comment.get('line', 1)  # Use 'line' instead of 'position'
+            })
+        except KeyError as e:
+            print(f"Skipping invalid comment: {comment}")
+            continue
 
-        # Create draft review with correct parameters
-        review = pull_request.create_review(
-            commit=commit,
-            body="AI Code Review Comments",
-            event="COMMENT"  # Change to "APPROVE" or "REQUEST_CHANGES" if needed
+    try:
+        # Create review with all comments at once
+        pull_request.create_review(
+            commit=repo.get_commit(head_sha),
+            body="AI Code Review Summary",
+            comments=github_comments,
+            event="COMMENT"
         )
-        
-        # Create review comment with correct parameters
-        review.create_comment(
-            body=comment['body'],
-            path=comment['path'],
-            line=comment['position']  # Changed from 'position' to 'line'
-        )
-        
     except Exception as e:
-        print(f"Failed to post comment: {str(e)}")
-        print(f"Problematic comment data: {comment}")
+        print(f"Failed to post comments: {str(e)}")
+        print(f"Problematic comments: {comments}")
