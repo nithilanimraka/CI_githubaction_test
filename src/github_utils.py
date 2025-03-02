@@ -19,7 +19,11 @@ def get_pull_request_diff():
     # Get diff content
     diff_url = pull_request.diff_url
     response = requests.get(diff_url)
-    return response.text
+
+    # Get latest commit ID
+    latest_commit_id = pull_request.head.sha
+
+    return response.text, latest_commit_id  # Return diff + commit ID
 
 def post_review_comment(comment):
     """Post a review comment back to the pull request"""

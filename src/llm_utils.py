@@ -7,7 +7,7 @@ from typing import List, Dict
 
 def analyze_code_changes(diff_content: str) -> List[Dict]:
     """
-    Analyze code changes using OpenAI's GPT model
+    Analyze code changes using GEMINI model
     Returns a list of review comments
     """
     API_KEY = os.getenv('GEMINI_API_KEY')
@@ -17,12 +17,13 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
 
     # Prepare the prompt for the LLM
     prompt = f"""
-    Analyze the following code changes and provide detailed review comments.
-    Focus on:
-    - Code quality and best practices
-    - Potential security vulnerabilities
-    - Performance implications
-    - Code style consistency
+    Analyze the following code changes and provide detailed review comments in JSON format.
+    Each comment should have:
+    - "body": The review comment text
+    - "path": The file where the comment applies
+    - "position": The line number in the diff where the comment should be placed
+
+    Return ONLY valid JSON, without any additional text.
 
     Diff content:
     {diff_content}
@@ -36,56 +37,24 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
     )   
 
     print(response.text)
-    
+
     # Parse and format the response
     review_comments = parse_llm_response(response.text)
     return review_comments
 
 def parse_llm_response(response: str) -> List[Dict]:
     """
-    Parse the LLM response and format it into review comments
-    Returns a list of structured comment objects
+    Parses the LLM response and formats it into GitHub review comments.
+
+    Args:
+        response (str): The JSON response from OpenAI GPT.
+
+    Returns:
+        List[Dict]: A list of structured review comments.
     """
-    review_comments = []
-    
     try:
-        # Attempt to parse JSON if the model returns structured data
-        parsed_response = json.loads(response)
-        if isinstance(parsed_response, list):
-            return parsed_response  # Assuming the LLM gives a structured JSON list
+        # Ensure the response is JSON
+        return json.loads(response)
     except json.JSONDecodeError:
-        # If not JSON, process the text response
-        pass
-
-    # Fallback: Extracting comments from plain text response
-    sections = response.split("\n\n")  # Assuming comments are separated by double newlines
-
-    for section in sections:
-        lines = section.split("\n")
-        if len(lines) >= 3:
-            # Extracting comment components
-            file_line_info = lines[0].strip()  # Expected format: "File: filename.py, Line: 10"
-            comment_body = "\n".join(lines[1:]).strip()
-
-            # Extract filename and line number
-            file_path = None
-            position = None
-
-            if "File:" in file_line_info and "Line:" in file_line_info:
-                try:
-                    parts = file_line_info.replace("File:", "").replace("Line:", "").split(",")
-                    file_path = parts[0].strip()
-                    position = int(parts[1].strip())
-                except ValueError:
-                    continue  # Skip if parsing fails
-
-            # Create structured comment
-            if file_path and position:
-                review_comments.append({
-                    "body": comment_body,
-                    "commit_id": "LATEST_COMMIT_ID",  # Needs to be dynamically set
-                    "path": file_path,
-                    "position": position
-                })
-
-    return review_comments
+        print("Error: LLM response is not valid JSON")
+        return []

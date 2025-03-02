@@ -8,8 +8,8 @@ class AICodeReviewer:
         self.github_token = os.getenv('GIT_TOKEN')
 
     def review_pull_request(self):
-        # Get the PR diff
-        diff_content = get_pull_request_diff()
+        # Get the PR diff and latest commit ID
+        diff_content, latest_commit_id = get_pull_request_diff()
 
         # Analyze changes using LLM
         review_comments = analyze_code_changes(diff_content)
