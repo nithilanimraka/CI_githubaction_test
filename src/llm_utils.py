@@ -17,12 +17,29 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
 
     # Prepare the prompt for the LLM
     prompt = f"""
-    Analyze the following code changes and provide detailed review comments.
+    Analyze the following code changes and provide review comments using EXACTLY this format:
+
+    FILE: [file-path]
+    LINE: [line-number]
+    COMMENT: [your comment]
+    SUGGESTION: [optional suggested code]
+
+    ---
+    Example:
+    FILE: src/app.py
+    LINE: 42
+    COMMENT: Avoid magic numbers, consider using a constant
+    SUGGESTION: MAX_RETRIES = 3
+
+    ---
+
     Focus on:
-    - Code quality and best practices
-    - Potential security vulnerabilities
-    - Performance implications
-    - Code style consistency
+    - Code quality issues
+    - Security vulnerabilities
+    - Performance optimizations
+    - Style inconsistencies
+    - Possible bugs
+    - Missing documentation
 
     Diff content:
     {diff_content}
@@ -48,44 +65,50 @@ def parse_llm_response(response: str) -> List[Dict]:
     """
     review_comments = []
     
-    try:
-        # Attempt to parse JSON if the model returns structured data
-        parsed_response = json.loads(response)
-        if isinstance(parsed_response, list):
-            return parsed_response  # Assuming the LLM gives a structured JSON list
-    except json.JSONDecodeError:
-        # If not JSON, process the text response
-        pass
-
-    # Fallback: Extracting comments from plain text response
-    sections = response.split("\n\n")  # Assuming comments are separated by double newlines
-
-    for section in sections:
-        lines = section.split("\n")
-        if len(lines) >= 3:
-            # Extracting comment components
-            file_line_info = lines[0].strip()  # Expected format: "File: filename.py, Line: 10"
-            comment_body = "\n".join(lines[1:]).strip()
-
-            # Extract filename and line number
-            file_path = None
-            position = None
-
-            if "File:" in file_line_info and "Line:" in file_line_info:
+    # Split response into individual comments
+    comment_blocks = response.split('---')
+    
+    for block in comment_blocks:
+        lines = [line.strip() for line in block.split('\n') if line.strip()]
+        if not lines:
+            continue
+            
+        comment_data = {
+            'body': '',
+            'path': None,
+            'position': 1,  # Default to first line if not specified
+            'suggestion': None
+        }
+        
+        current_section = None
+        for line in lines:
+            if line.startswith('FILE:'):
+                comment_data['path'] = line.split('FILE:')[1].strip()
+            elif line.startswith('LINE:'):
                 try:
-                    parts = file_line_info.replace("File:", "").replace("Line:", "").split(",")
-                    file_path = parts[0].strip()
-                    position = int(parts[1].strip())
+                    comment_data['position'] = int(line.split('LINE:')[1].strip())
                 except ValueError:
-                    continue  # Skip if parsing fails
-
-            # Create structured comment
-            if file_path and position:
-                review_comments.append({
-                    "body": comment_body,
-                    "commit_id": "LATEST_COMMIT_ID",  # Needs to be dynamically set
-                    "path": file_path,
-                    "position": position
-                })
-
+                    pass  # Keep default position if invalid line number
+            elif line.startswith('COMMENT:'):
+                comment_data['body'] = line.split('COMMENT:')[1].strip()
+            elif line.startswith('SUGGESTION:'):
+                comment_data['suggestion'] = line.split('SUGGESTION:')[1].strip()
+            else:
+                # Handle multi-line comments
+                if comment_data['body']:
+                    comment_data['body'] += '\n' + line
+                else:
+                    comment_data['body'] = line
+        
+        # Add code suggestion as markdown if provided
+        if comment_data['suggestion']:
+            comment_data['body'] += f"\n\n```suggestion\n{comment_data['suggestion']}\n```"
+        
+        if comment_data['path'] and comment_data['body']:
+            review_comments.append({
+                'body': comment_data['body'],
+                'path': comment_data['path'],
+                'position': comment_data['position']
+            })
+    
     return review_comments

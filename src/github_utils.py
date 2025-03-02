@@ -32,11 +32,16 @@ def post_review_comment(comment):
     repo = g.get_repo(event_data['repository']['full_name'])
     pr_number = event_data['pull_request']['number']
     pull_request = repo.get_pull(pr_number)
+    head_sha = event_data['pull_request']['head']['sha']
 
-    # Create review comment
-    pull_request.create_review_comment(
-        body=comment['body'],
-        commit_id=comment['commit_id'],
-        path=comment['path'],
-        position=comment['position']
-    )
+    #Create review comment
+    try:
+        pull_request.create_review_comment(
+            body=comment['body'],
+            commit_id=head_sha,
+            path=comment['path'],
+            position=comment['position']
+        )
+    except Exception as e:
+        print(f"Failed to post comment: {str(e)}")
+        print(f"Problematic comment data: {comment}")
