@@ -36,9 +36,12 @@ def post_review_comment(comment):
 
     #Create review comment
     try:
+        # Get the actual Commit object using the SHA
+        commit = repo.get_commit(head_sha)
+
         pull_request.create_review_comment(
             body=comment['body'],
-            commit_id=head_sha,
+            commit=commit, # Changed from commit_id to commit
             path=comment['path'],
             position=comment['position']
         )
