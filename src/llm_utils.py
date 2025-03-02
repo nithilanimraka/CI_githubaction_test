@@ -29,7 +29,7 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
     - "path": The file where the comment applies
     - "position": The line number in the diff where the comment should be placed
 
-    Ensure the response is ONLY valid JSON. Do not include explanations or extra text.
+    Ensure the response is **ONLY valid JSON**, with no extra text like "json" or explanations.
 
     Diff content:
     {diff_content}
