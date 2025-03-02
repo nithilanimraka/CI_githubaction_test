@@ -17,13 +17,19 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
 
     # Prepare the prompt for the LLM
     prompt = f"""
-    Analyze the following code changes and provide detailed review comments in JSON format.
+    Analyze the following code changes and provide detailed review comments in the following JSON format.
+
+    [
+    {{"body": "comment text", "path": "file_path", "position": line_number}},
+    ...
+    ]
+
     Each comment should have:
     - "body": The review comment text
     - "path": The file where the comment applies
     - "position": The line number in the diff where the comment should be placed
 
-    Return ONLY valid JSON, without any additional text.
+    Ensure the response is ONLY valid JSON. Do not include explanations or extra text.
 
     Diff content:
     {diff_content}
@@ -55,6 +61,6 @@ def parse_llm_response(response: str) -> List[Dict]:
     try:
         # Ensure the response is JSON
         return json.loads(response)
-    except json.JSONDecodeError:
-        print("Error: LLM response is not valid JSON")
-        return []
+    except json.JSONDecodeError as e:
+        print("Error: LLM response is not valid JSON : {e}")
+        return None
