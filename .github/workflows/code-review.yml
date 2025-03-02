@@ -23,6 +23,6 @@ jobs:
 
       - name: Run AI Code Review
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
         run: python src/reviewer.py
