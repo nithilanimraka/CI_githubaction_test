@@ -1,0 +1,11 @@
+# GitHub API Wrapper
+PyGithub==2.1.1
+
+# GEMINI API
+google-genai
+
+# HTTP Requests
+requests==2.31.0
+
+# Environment Variables
+python-dotenv==1.0.0
