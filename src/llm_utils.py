@@ -117,33 +117,53 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
 def parse_llm_response(response: str) -> List[Dict]:
     review_comments = []
     
-    # Split response into comment blocks
     comment_blocks = response.split('---')
-    
     for block in comment_blocks:
-        lines = block.strip().split('\n')
+        lines = [line.strip() for line in block.split('\n') if line.strip()]
+        if not lines:
+            continue
+
         comment_data = {
             'path': None,
-            'line': 1,
+            'line': None,
             'body': ''
         }
-        
+
+        # Required fields check
+        has_file = False
+        has_comment = False
+
         for line in lines:
-            line = line.strip()
             if line.startswith('FILE:'):
                 comment_data['path'] = line.split('FILE:', 1)[1].strip()
+                has_file = True
             elif line.startswith('LINE:'):
                 try:
                     comment_data['line'] = int(line.split('LINE:', 1)[1].strip())
                 except (ValueError, IndexError):
-                    pass
-            elif line:
-                if comment_data['body']:
-                    comment_data['body'] += '\n' + line
-                else:
-                    comment_data['body'] = line
-        
-        if comment_data['path'] and comment_data['body']:
-            review_comments.append(comment_data)
-    
+                    continue
+            elif line.startswith('COMMENT:'):
+                comment_body = line.split('COMMENT:', 1)[1].strip()
+                comment_data['body'] += f"{comment_body}\n"
+                has_comment = True
+            elif line.startswith('SUGGESTION:'):
+                suggestion = line.split('SUGGESTION:', 1)[1].strip()
+                if suggestion and suggestion != 'N/A':
+                    comment_data['body'] += f"\n```suggestion\n{suggestion}\n```"
+            else:
+                # Handle multi-line comments
+                comment_data['body'] += f"\n{line}"
+
+        # Only add valid comments
+        if has_file and has_comment and comment_data['line']:
+            # Clean up comment formatting
+            comment_data['body'] = comment_data['body'].strip()
+            review_comments.append({
+                'path': comment_data['path'],
+                'line': comment_data['line'],
+                'body': comment_data['body']
+            })
+        else:
+            print(f"Skipping invalid comment block: {block}")
+
     return review_comments
