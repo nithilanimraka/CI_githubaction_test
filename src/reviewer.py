@@ -1,5 +1,5 @@
 import os
-from github_utils import get_pull_request_diff, post_review_comment
+from github_utils import get_pull_request_diff
 from llm_utils import analyze_code_changes
 
 class AICodeReviewer:
