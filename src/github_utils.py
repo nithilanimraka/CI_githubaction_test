@@ -46,60 +46,65 @@ def get_valid_lines(diff_content):
     return valid_lines
 
 
-def post_review_comment(comments, diff_content):
-    """Post validated review comments to GitHub"""
-    g = Github(os.getenv('GIT_TOKEN'))
+"""
+Posting can be done later when logs are correct and accurate. The line numbers are faulty and need to be fixed.
+"""
 
-    # Load GitHub event data
-    event_path = os.getenv('GITHUB_EVENT_PATH')
-    with open(event_path, 'r') as f:
-        event_data = json.load(f)
 
-    # Get repository and PR details
-    repo = g.get_repo(event_data['repository']['full_name'])
-    pr_number = event_data['pull_request']['number']
-    pull_request = repo.get_pull(pr_number)
-    head_sha = event_data['pull_request']['head']['sha']
+# def post_review_comment(comments, diff_content):
+#     """Post validated review comments to GitHub"""
+#     g = Github(os.getenv('GIT_TOKEN'))
 
-    # Get valid lines from diff
-    valid_lines = get_valid_lines(diff_content)
+#     # Load GitHub event data
+#     event_path = os.getenv('GITHUB_EVENT_PATH')
+#     with open(event_path, 'r') as f:
+#         event_data = json.load(f)
+
+#     # Get repository and PR details
+#     repo = g.get_repo(event_data['repository']['full_name'])
+#     pr_number = event_data['pull_request']['number']
+#     pull_request = repo.get_pull(pr_number)
+#     head_sha = event_data['pull_request']['head']['sha']
+
+#     # Get valid lines from diff
+#     valid_lines = get_valid_lines(diff_content)
     
-    # Prepare filtered comments
-    filtered_comments = []
-    for comment in comments:
-        try:
-            file_path = comment['path']
-            line_num = comment.get('line', 1)
+#     # Prepare filtered comments
+#     filtered_comments = []
+#     for comment in comments:
+#         try:
+#             file_path = comment['path']
+#             line_num = comment.get('line', 1)
             
-            # Validate against actual diff
-            if file_path in valid_lines and line_num in valid_lines[file_path]:
-                filtered_comments.append({
-                    "path": file_path,
-                    "position": line_num,  # GitHub expects 'position' not 'line'
-                    "body": comment['body']
-                })
-            else:
-                print(f"Skipping invalid comment - File: {file_path}, Line: {line_num}")
+#             # Validate against actual diff
+#             if file_path in valid_lines and line_num in valid_lines[file_path]:
+#                 filtered_comments.append({
+#                     "path": file_path,
+#                     "position": line_num,  # GitHub expects 'position' not 'line'
+#                     "body": comment['body']
+#                 })
+#             else:
+#                 print(f"Skipping invalid comment - File: {file_path}, Line: {line_num}")
                 
-        except KeyError as e:
-            print(f"Skipping malformed comment: {comment} - Missing key: {e}")
+#         except KeyError as e:
+#             print(f"Skipping malformed comment: {comment} - Missing key: {e}")
 
-    if not filtered_comments:
-        print("No valid comments to post after filtering")
-        return
+#     if not filtered_comments:
+#         print("No valid comments to post after filtering")
+#         return
 
-    try:
-        # Create review with valid comments
-        pull_request.create_review(
-            commit=repo.get_commit(head_sha),
-            body="AI Code Review Summary",
-            comments=filtered_comments,
-            event="COMMENT"
-        )
-        print(f"Successfully posted {len(filtered_comments)} comments")
+#     try:
+#         # Create review with valid comments
+#         pull_request.create_review(
+#             commit=repo.get_commit(head_sha),
+#             body="AI Code Review Summary",
+#             comments=filtered_comments,
+#             event="COMMENT"
+#         )
+#         print(f"Successfully posted {len(filtered_comments)} comments")
         
-    except Exception as e:
-        print(f"Failed to post comments: {str(e)}")
-        if hasattr(e, 'data'):
-            print(f"Error details: {json.dumps(e.data, indent=2)}")
-        print("Problematic comments structure:", json.dumps(filtered_comments[:2], indent=2))
+#     except Exception as e:
+#         print(f"Failed to post comments: {str(e)}")
+#         if hasattr(e, 'data'):
+#             print(f"Error details: {json.dumps(e.data, indent=2)}")
+#         print("Problematic comments structure:", json.dumps(filtered_comments[:2], indent=2))

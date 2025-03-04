@@ -15,11 +15,11 @@ class AICodeReviewer:
             # Analyze changes using LLM
             review_comments = analyze_code_changes(diff_content)
 
-            # Post all comments in a single batch
-            if review_comments:
-                post_review_comment(review_comments, diff_content)
-            else:
-                print("No valid review comments generated")
+            # # Post all comments in a single batch
+            # if review_comments:
+            #     post_review_comment(review_comments, diff_content)
+            # else:
+            #     print("No valid review comments generated")
 
         except Exception as e:
             print(f"Review failed: {str(e)}")
