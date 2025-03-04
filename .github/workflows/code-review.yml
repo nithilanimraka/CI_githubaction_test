@@ -3,10 +3,6 @@ name: AI Code Review
 on:
   pull_request:
     types: [opened, synchronize]
-    paths:
-      - '**.py'
-      - '**.yml'
-      - '**.md'
 
 permissions:
   pull-requests: write
