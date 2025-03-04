@@ -55,7 +55,7 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
     print(response.text)
     
     # Parse and format the response
-    review_comments = response.text
+    review_comments = parse_llm_response(response.text)
     return review_comments
 
 # def parse_llm_response(response: str) -> List[Dict]:
@@ -119,49 +119,49 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
 This is the final code given by deepseek to parse the response from the LLM model. It includes errors
 """
 
-# def parse_llm_response(response: str) -> List[Dict]:
-#     review_comments = []
+def parse_llm_response(response: str) -> List[Dict]:
+    review_comments = []
     
-#     comment_blocks = response.split('---')
-#     for block in comment_blocks:
-#         lines = [line.strip() for line in block.split('\n') if line.strip()]
-#         if not lines:
-#             continue
+    comment_blocks = response.split('---')
+    for block in comment_blocks:
+        lines = [line.strip() for line in block.split('\n') if line.strip()]
+        if not lines:
+            continue
 
-#         comment_data = {
-#             'path': None,
-#             'line': None,
-#             'body': ''
-#         }
+        comment_data = {
+            'path': None,
+            'line': None,
+            'body': ''
+        }
 
-#         # Validate required fields
-#         required_fields = {'FILE', 'LINE', 'COMMENT'}
-#         present_fields = set()
+        # Validate required fields
+        required_fields = {'FILE', 'LINE', 'COMMENT'}
+        present_fields = set()
         
-#         for line in lines:
-#             if line.startswith('FILE:'):
-#                 comment_data['path'] = line.split('FILE:', 1)[1].strip()
-#                 present_fields.add('FILE')
-#             elif line.startswith('LINE:'):
-#                 try:
-#                     comment_data['line'] = int(line.split('LINE:', 1)[1].strip())
-#                     present_fields.add('LINE')
-#                 except (ValueError, IndexError):
-#                     continue
-#             elif line.startswith('COMMENT:'):
-#                 comment_data['body'] += line.split('COMMENT:', 1)[1].strip() + '\n'
-#                 present_fields.add('COMMENT')
-#             elif line.startswith('SUGGESTION:'):
-#                 suggestion = line.split('SUGGESTION:', 1)[1].strip()
-#                 if suggestion:
-#                     comment_data['body'] += f"\n```suggestion\n{suggestion}\n```"
-#             else:
-#                 comment_data['body'] += line + '\n'
+        for line in lines:
+            if line.startswith('FILE:'):
+                comment_data['path'] = line.split('FILE:', 1)[1].strip()
+                present_fields.add('FILE')
+            elif line.startswith('LINE:'):
+                try:
+                    comment_data['line'] = int(line.split('LINE:', 1)[1].strip())
+                    present_fields.add('LINE')
+                except (ValueError, IndexError):
+                    continue
+            elif line.startswith('COMMENT:'):
+                comment_data['body'] += line.split('COMMENT:', 1)[1].strip() + '\n'
+                present_fields.add('COMMENT')
+            elif line.startswith('SUGGESTION:'):
+                suggestion = line.split('SUGGESTION:', 1)[1].strip()
+                if suggestion:
+                    comment_data['body'] += f"\n```suggestion\n{suggestion}\n```"
+            else:
+                comment_data['body'] += line + '\n'
 
-#         if required_fields.issubset(present_fields):
-#             comment_data['body'] = comment_data['body'].strip()
-#             review_comments.append(comment_data)
-#         else:
-#             print(f"Skipping invalid comment block: {block}")
+        if required_fields.issubset(present_fields):
+            comment_data['body'] = comment_data['body'].strip()
+            review_comments.append(comment_data)
+        else:
+            print(f"Skipping invalid comment block: {block}")
 
-#     return review_comments
+    return review_comments
