@@ -122,46 +122,51 @@ This is the final code given by deepseek to parse the response from the LLM mode
 def parse_llm_response(response: str) -> List[Dict]:
     review_comments = []
     
+    # Split response into valid comment blocks
     comment_blocks = response.split('---')
+    
     for block in comment_blocks:
-        lines = [line.strip() for line in block.split('\n') if line.strip()]
-        if not lines:
+        block = block.strip()
+        if not block:
             continue
-
+            
         comment_data = {
             'path': None,
             'line': None,
             'body': ''
         }
-
-        # Validate required fields
-        required_fields = {'FILE', 'LINE', 'COMMENT'}
-        present_fields = set()
         
-        for line in lines:
+        # Validate required fields
+        has_file = False
+        has_line = False
+        has_comment = False
+        
+        for line in block.split('\n'):
+            line = line.strip()
             if line.startswith('FILE:'):
-                comment_data['path'] = line.split('FILE:', 1)[1].strip()
-                present_fields.add('FILE')
+                comment_data['path'] = line.split('FILE:', 1)[-1].strip()
+                has_file = True
             elif line.startswith('LINE:'):
                 try:
-                    comment_data['line'] = int(line.split('LINE:', 1)[1].strip())
-                    present_fields.add('LINE')
+                    comment_data['line'] = int(line.split('LINE:', 1)[-1].strip())
+                    has_line = True
                 except (ValueError, IndexError):
                     continue
             elif line.startswith('COMMENT:'):
-                comment_data['body'] += line.split('COMMENT:', 1)[1].strip() + '\n'
-                present_fields.add('COMMENT')
+                comment_data['body'] += line.split('COMMENT:', 1)[-1].strip() + '\n'
+                has_comment = True
             elif line.startswith('SUGGESTION:'):
-                suggestion = line.split('SUGGESTION:', 1)[1].strip()
-                if suggestion:
+                suggestion = line.split('SUGGESTION:', 1)[-1].strip()
+                if suggestion and suggestion != 'N/A':
                     comment_data['body'] += f"\n```suggestion\n{suggestion}\n```"
-            else:
+            elif line:
                 comment_data['body'] += line + '\n'
-
-        if required_fields.issubset(present_fields):
+        
+        # Only add properly formatted comments
+        if has_file and has_line and has_comment:
             comment_data['body'] = comment_data['body'].strip()
             review_comments.append(comment_data)
         else:
-            print(f"Skipping invalid comment block: {block}")
-
+            print(f"Skipping invalid comment block:\n{block}")
+            
     return review_comments

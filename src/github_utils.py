@@ -88,6 +88,12 @@ def post_review_comment(comments, diff_content):
     # Prepare filtered comments
     filtered_comments = []
     for comment in comments:
+
+        # Ensure we're dealing with a dictionary
+        if not isinstance(comment, dict):
+            print(f"Skipping invalid comment type: {type(comment)}")
+            continue
+
         try:
             file_path = comment['path']
             line_num = comment.get('line', 1)
