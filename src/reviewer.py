@@ -1,5 +1,5 @@
 import os
-from github_utils import get_pull_request_diff
+from github_utils import get_pull_request_diff, post_review_comment
 from llm_utils import analyze_code_changes
 
 class AICodeReviewer:
@@ -11,15 +11,18 @@ class AICodeReviewer:
         try:
             # Get the PR diff
             diff_content = get_pull_request_diff()
+            if not diff_content:
+                print("No diff content found")
+                return
 
             # Analyze changes using LLM
             review_comments = analyze_code_changes(diff_content)
 
-            # # Post all comments in a single batch
-            # if review_comments:
-            #     post_review_comment(review_comments, diff_content)
-            # else:
-            #     print("No valid review comments generated")
+            # Post all comments in a single batch
+            if review_comments:
+                post_review_comment(review_comments, diff_content)
+            else:
+                print("No valid review comments generated")
 
         except Exception as e:
             print(f"Review failed: {str(e)}")
