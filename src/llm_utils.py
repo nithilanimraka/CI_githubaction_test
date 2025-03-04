@@ -129,40 +129,33 @@ def parse_llm_response(response: str) -> List[Dict]:
             'body': ''
         }
 
-        # Required fields check
-        has_file = False
-        has_comment = False
-
+        # Validate required fields
+        required_fields = {'FILE', 'LINE', 'COMMENT'}
+        present_fields = set()
+        
         for line in lines:
             if line.startswith('FILE:'):
                 comment_data['path'] = line.split('FILE:', 1)[1].strip()
-                has_file = True
+                present_fields.add('FILE')
             elif line.startswith('LINE:'):
                 try:
                     comment_data['line'] = int(line.split('LINE:', 1)[1].strip())
+                    present_fields.add('LINE')
                 except (ValueError, IndexError):
                     continue
             elif line.startswith('COMMENT:'):
-                comment_body = line.split('COMMENT:', 1)[1].strip()
-                comment_data['body'] += f"{comment_body}\n"
-                has_comment = True
+                comment_data['body'] += line.split('COMMENT:', 1)[1].strip() + '\n'
+                present_fields.add('COMMENT')
             elif line.startswith('SUGGESTION:'):
                 suggestion = line.split('SUGGESTION:', 1)[1].strip()
-                if suggestion and suggestion != 'N/A':
+                if suggestion:
                     comment_data['body'] += f"\n```suggestion\n{suggestion}\n```"
             else:
-                # Handle multi-line comments
-                comment_data['body'] += f"\n{line}"
+                comment_data['body'] += line + '\n'
 
-        # Only add valid comments
-        if has_file and has_comment and comment_data['line']:
-            # Clean up comment formatting
+        if required_fields.issubset(present_fields):
             comment_data['body'] = comment_data['body'].strip()
-            review_comments.append({
-                'path': comment_data['path'],
-                'line': comment_data['line'],
-                'body': comment_data['body']
-            })
+            review_comments.append(comment_data)
         else:
             print(f"Skipping invalid comment block: {block}")
 
