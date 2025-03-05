@@ -81,12 +81,13 @@ def parse_llm_response(response: str) -> List[Dict]:
     review_comments = []
     
     for block in response.split('---'):
-        lines = [line.strip() for line in block.split('\n') if line.strip()]
+        lines = [line.rstrip() for line in block.split('\n') if line.strip()]
         if not lines:
             continue
-            
+
         comment = {'path': None, 'start_line': None, 'end_line': None, 'body': []}
-        has_required_fields = False
+        in_suggestion = False
+        suggestion_lines = []
         
         for line in lines:
             if line.startswith('FILE:'):
@@ -97,38 +98,41 @@ def parse_llm_response(response: str) -> List[Dict]:
                     start = int(parts[0])
                     end = int(parts[1])
                     comment['start_line'], comment['end_line'] = sorted([start, end])
-                    has_required_fields = True
                 except (ValueError, IndexError):
                     continue
             elif line.startswith('COMMENT:'):
                 comment['body'].append(line.split('COMMENT:', 1)[-1].strip())
             elif line.startswith('SUGGESTION:'):
-                suggestion = line.split('SUGGESTION:', 1)[-1].strip()
-                if suggestion and suggestion != 'N/A':
-                    comment['body'].append(f'```suggestion\n{suggestion}\n```')
-            elif line:
+                in_suggestion = True
+                suggestion_lines = []
+            elif in_suggestion:
+                if line == '```':
+                    in_suggestion = False
+                    if suggestion_lines:
+                        comment['body'].append('```suggestion\n' + '\n'.join(suggestion_lines) + '\n```')
+                else:
+                    suggestion_lines.append(line)
+            else:
                 comment['body'].append(line)
 
-        # Strict validation
-        if (comment['path'] and 
-            isinstance(comment['start_line'], int) and 
-            isinstance(comment['end_line'], int) and 
-            comment['start_line'] <= comment['end_line'] and 
-            has_required_fields):
+        # Validation
+        if all([comment['path'],
+              isinstance(comment['start_line'], int),
+              isinstance(comment['end_line'], int),
+              comment['start_line'] <= comment['end_line']]):
             
-            line_range = (f"Lines {comment['start_line']}-{comment['end_line']}" 
+            # Format body
+            line_range = (f"**Lines {comment['start_line']}-{comment['end_line']}:**\n" 
                          if comment['start_line'] != comment['end_line'] 
-                         else f"Line {comment['start_line']}")
+                         else f"**Line {comment['start_line']}:**\n")
             
-            formatted_body = f"**{line_range}**\n" + '\n'.join(comment['body'])
+            formatted_body = line_range + '\n'.join(comment['body'])
             review_comments.append({
                 'path': comment['path'],
                 'start_line': comment['start_line'],
                 'end_line': comment['end_line'],
                 'body': formatted_body
             })
-        else:
-            print(f"Skipping invalid block: {block}")
     
     return review_comments
 

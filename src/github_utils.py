@@ -39,32 +39,31 @@ def get_valid_hunks(diff_content):
             current_file = line.split(' b/')[1].split()[0]
             valid_lines = set()
             new_line = None
+            continue
             
-        elif line.startswith('@@'):
+        if line.startswith('@@'):
             # Parse hunk header: @@ -old_start,old_lines +new_start,new_lines @@
             parts = line.split('+')
             if len(parts) > 1:
-                new_part = parts[1].split()[0].split(',')
                 try:
+                    new_part = parts[1].split()[0].split(',')
                     new_start = int(new_part[0])
-                    new_lines = int(new_part[1]) if len(new_part) > 1 else 1
+                    new_count = int(new_part[1]) if len(new_part) > 1 else 1
                     new_line = new_start
-                except ValueError:
+                    # Add all lines in this hunk range
+                    valid_lines.update(range(new_start, new_start + new_count))
+                except (ValueError, IndexError):
                     new_line = None
-                    
-        elif new_line is not None:
+            continue
+            
+        if new_line is not None:
             if line.startswith('+'):
-                # Added line - valid for commenting
-                valid_lines.add(new_line)
+                # Track added lines
                 new_line += 1
             elif line.startswith(' '):
-                # Context line - valid for commenting
-                valid_lines.add(new_line)
+                # Track context lines
                 new_line += 1
-            elif line.startswith('-'):
-                # Deleted line - skip
-                pass
-                
+
     # Add final file
     if current_file:
         hunks.append({'file': current_file, 'lines': valid_lines})
@@ -72,12 +71,12 @@ def get_valid_hunks(diff_content):
     return hunks
 
 def validate_comment(comment, hunks):
-    """Validate comment against actual diff lines with range check"""
+    """Validate comment against actual diff lines with precise checking"""
     for hunk in hunks:
         if hunk['file'] == comment['path']:
-            # Check all lines in the range exist
-            required_lines = set(range(comment['start_line'], comment['end_line'] + 1))
-            if required_lines.issubset(hunk['lines']):
+            # Check if any line in the range exists in the diff
+            comment_lines = set(range(comment['start_line'], comment['end_line'] + 1))
+            if comment_lines & hunk['lines']:
                 return {
                     'path': comment['path'],
                     'start_line': comment['start_line'],
