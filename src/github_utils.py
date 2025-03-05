@@ -63,10 +63,6 @@ def get_valid_lines(diff_content):
     return valid_lines
 
 
-"""
-Posting can be done later when logs are correct and accurate. The line numbers are faulty and need to be fixed.
-"""
-
 
 def post_review_comment(comments, diff_content):
     """Post validated review comments to GitHub"""

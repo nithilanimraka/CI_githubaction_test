@@ -1,4 +1,3 @@
 from test1 import func
 
-
-func()
+print("hello")
