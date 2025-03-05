@@ -14,9 +14,9 @@ class AICodeReviewer:
         # Analyze changes using LLM
         review_comments = analyze_code_changes(diff_content)
 
-        # Post comments back to GitHub
-        for comment in review_comments:
-            post_review_comment(comment)
+        # # Post comments back to GitHub
+        # for comment in review_comments:
+        #     post_review_comment(comment)
 
 if __name__ == '__main__':
     reviewer = AICodeReviewer()
