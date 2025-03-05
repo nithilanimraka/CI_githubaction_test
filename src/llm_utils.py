@@ -61,11 +61,6 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
     return review_comments
 
 
-
-"""
-This is the final code given by deepseek to parse the response from the LLM model. It includes errors
-"""
-
 def parse_llm_response(response: str) -> List[Dict]:
     review_comments = []
     
