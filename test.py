@@ -1,4 +1,5 @@
 from test1 import func
 
 print("my")
-print("world")
+print("test1")
+print("testtttt")
