@@ -17,31 +17,48 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
 
     # Prepare the prompt for the LLM
     prompt = f"""
-    Analyze the following code changes and provide review comments using EXACTLY this format:
+    Analyze these code changes and provide feedback using EXACTLY this format:
 
     FILE: [file-path]
-    LINE: [line-number]
+    LINE_START: [starting-line-number]
+    LINE_END: [ending-line-number]
     COMMENT: [your comment]
     SUGGESTION: [optional suggested code]
 
     ---
-    Example:
+    Example 1 (single line):
     FILE: src/app.py
-    LINE: 42
-    COMMENT: Avoid magic numbers, consider using a constant
+    LINE_START: 42
+    LINE_END: 42
+    COMMENT: Avoid magic numbers
     SUGGESTION: MAX_RETRIES = 3
 
     ---
 
-    Make sure to insert '---' in between two review comments. IT IS A MUST!!!
+    Example 2 (multi-line):
+    FILE: src/utils.py
+    LINE_START: 15
+    LINE_END: 18
+    COMMENT: Missing error handling
+    SUGGESTION: 
+        try:
+            database.connect()
+        except ConnectionError as e:
+            logger.error(f"Connection failed: {e}")
+
+    ---
+    Key rules:
+    1. LINE_END >= LINE_START
+    2. Both lines must be in the same diff hunk
+    3. Use LINE_END=LINE_START for single-line issues
+    4. Separate comments with ---
 
     Focus on:
-    - Code quality issues
-    - Security vulnerabilities
-    - Performance optimizations
-    - Style inconsistencies
-    - Possible bugs
-    - Missing documentation
+    - Code quality
+    - Security
+    - Performance
+    - Style consistency
+    - Documentation
 
     Diff content:
     {diff_content}
@@ -63,60 +80,59 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
 
 def parse_llm_response(response: str) -> List[Dict]:
     review_comments = []
-    
-    # Split response into valid comment blocks
     comment_blocks = response.split('---')
     
     for block in comment_blocks:
-        block = block.strip()
-        if not block:
-            continue
-            
+        lines = [line.strip() for line in block.split('\n') if line.strip()]
         comment_data = {
             'path': None,
-            'line': None,
-            'body': ''
+            'start_line': None,
+            'end_line': None,
+            'body': []
         }
         
-        # Validate required fields
-        has_file = False
-        has_line = False
-        has_comment = False
-        
-        for line in block.split('\n'):
-
-            line = line.strip()
-
+        for line in lines:
             if line.startswith('FILE:'):
                 comment_data['path'] = line.split('FILE:', 1)[-1].strip()
-                has_file = True
-
-            elif line.startswith('LINE:'):
+            elif line.startswith('LINE_START:'):
                 try:
-                    comment_data['line'] = int(line.split('LINE:', 1)[-1].strip())
-                    has_line = True
-                except (ValueError, IndexError):
+                    comment_data['start_line'] = int(line.split('LINE_START:', 1)[-1].strip())
+                except ValueError:
                     continue
-
+            elif line.startswith('LINE_END:'):
+                try:
+                    comment_data['end_line'] = int(line.split('LINE_END:', 1)[-1].strip())
+                except ValueError:
+                    continue
             elif line.startswith('COMMENT:'):
-                comment_data['body'] += line.split('COMMENT:', 1)[-1].strip() + '\n'
-                has_comment = True
-
+                comment_data['body'].append(line.split('COMMENT:', 1)[-1].strip())
             elif line.startswith('SUGGESTION:'):
                 suggestion = line.split('SUGGESTION:', 1)[-1].strip()
-                if suggestion and suggestion != 'N/A':
-                    comment_data['body'] += f"\n```suggestion\n{suggestion}\n```"
-
+                if suggestion:
+                    comment_data['body'].append(f"\n```suggestion\n{suggestion}\n```")
             elif line:
-                comment_data['body'] += line + '\n'
+                comment_data['body'].append(line)
         
-        # Only add properly formatted comments
-        if has_file and has_line and has_comment:
-            comment_data['body'] = comment_data['body'].strip()
-            review_comments.append(comment_data)
-        else:
-            print(f"Skipping invalid comment block:\n{block}")
+        # Validation
+        if (comment_data['path'] and 
+            comment_data['start_line'] is not None and
+            comment_data['end_line'] is not None and
+            comment_data['end_line'] >= comment_data['start_line'] and
+            comment_data['body']):
             
+            # Format body with line range header
+            line_range = f"Lines {comment_data['start_line']}-{comment_data['end_line']}:" if \
+                        comment_data['start_line'] != comment_data['end_line'] else \
+                        f"Line {comment_data['start_line']}:"
+            
+            comment_data['body'] = f"**{line_range}**\n" + '\n'.join(comment_data['body'])
+            review_comments.append({
+                'path': comment_data['path'],
+                'start_line': comment_data['start_line'],
+                'end_line': comment_data['end_line'],
+                'body': comment_data['body']
+            })
+    
     return review_comments
 
 

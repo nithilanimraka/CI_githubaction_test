@@ -24,50 +24,49 @@ def get_pull_request_diff():
 
 
 def get_valid_hunks(diff_content):
-    """Parse diff to find valid hunk positions"""
+    """Parse diff to track valid line ranges"""
     hunks = []
     current_hunk = None
-    current_file = None
     
     for line in diff_content.split('\n'):
         if line.startswith('diff --git'):
-            # New file section
-            current_file = line.split(' b/')[1].split()[0]
-        elif line.startswith('@@'):
-            # Hunk header format: @@ -old_start,old_lines +new_start,new_lines @@
-            parts = line.split(' ')
-            new_part = parts[2].split(',')
-            new_start = int(new_part[0][1:])
-            hunk_length = int(new_part[1])
-            
             current_hunk = {
-                'file': current_file,
-                'new_start': new_start,
-                'new_end': new_start + hunk_length - 1,
+                'file': line.split(' b/')[1].split()[0],
+                'start': None,
+                'end': None,
                 'lines': []
             }
             hunks.append(current_hunk)
+        elif line.startswith('@@'):
+            try:
+                new_part = line.split('+')[1].split()[0]
+                start = int(new_part.split(',')[0])
+                count = int(new_part.split(',')[1])
+                current_hunk['start'] = start
+                current_hunk['end'] = start + count - 1
+            except (IndexError, ValueError):
+                current_hunk = None
         elif current_hunk and line.startswith(('+', ' ')):
-            # Track valid lines in hunk (additions and context)
-            current_hunk['lines'].append({
-                'content': line,
-                'new_line': current_hunk['new_start'] + len(current_hunk['lines'])
-            })
+            current_hunk['lines'].append(line)
     
     return hunks
 
 
 def validate_comment(comment, hunks):
-    """Validate comment against actual diff hunks"""
+    """Validate line range within a single hunk"""
     for hunk in hunks:
-        if hunk['file'] == comment['path']:
-            for line in hunk['lines']:
-                if line['new_line'] == comment['line']:
-                    return {
-                        'path': comment['path'],
-                        'position': hunk['lines'].index(line) + 1,  # GitHub's 1-based hunk position
-                        'body': comment['body']
-                    }
+        if (hunk['file'] == comment['path'] and
+            comment['start_line'] >= hunk['start'] and
+            comment['end_line'] <= hunk['end']):
+            
+            return {
+                'path': comment['path'],
+                'start_line': comment['start_line'],
+                'line': comment['end_line'],
+                'body': comment['body'],
+                'start_side': 'RIGHT',
+                'side': 'RIGHT'
+            }
     return None
 
 
@@ -97,7 +96,7 @@ def post_review_comment(comments, diff_content):
         if validated:
             valid_comments.append(validated)
         else:
-            print(f"Skipping invalid comment - File: {comment['path']}, Line: {comment['line']}")
+            print(f"Skipping invalid range: {comment['path']} {comment['start_line']}-{comment['end_line']}")
 
     if not valid_comments:
         print("No valid comments to post")
@@ -111,5 +110,6 @@ def post_review_comment(comments, diff_content):
             comments=valid_comments,
             event="COMMENT"
         )
+        print(f"Posted {len(valid_comments)} comments")
     except Exception as e:
         print(f"Failed to post comments: {str(e)}")
