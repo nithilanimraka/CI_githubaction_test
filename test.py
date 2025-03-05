@@ -1,3 +1,4 @@
 from test1 import func
 
-print("hello")
+print("my")
+print("world")
