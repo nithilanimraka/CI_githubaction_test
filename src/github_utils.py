@@ -24,61 +24,51 @@ def get_pull_request_diff():
 
 
 def get_valid_hunks(diff_content):
-    """Parse diff to track valid line ranges with precise tracking"""
+    """Parse diff to track valid line ranges per hunk"""
     hunks = []
     current_file = None
+    current_hunk = None
     new_line = None
-    valid_lines = set()
-    
+
     for line in diff_content.split('\n'):
         if line.startswith('diff --git'):
-            # Finalize previous file
-            if current_file:
-                hunks.append({'file': current_file, 'lines': valid_lines})
-            # Start new file
             current_file = line.split(' b/')[1].split()[0]
-            valid_lines = set()
-            new_line = None
-            continue
-            
-        if line.startswith('@@'):
-            # Parse hunk header: @@ -old_start,old_lines +new_start,new_lines @@
+        elif line.startswith('@@'):
             parts = line.split('+')
             if len(parts) > 1:
+                new_part = parts[1].split()[0].split(',')
                 try:
-                    new_part = parts[1].split()[0].split(',')
                     new_start = int(new_part[0])
                     new_count = int(new_part[1]) if len(new_part) > 1 else 1
                     new_line = new_start
-                    # Add all lines in this hunk range
-                    valid_lines.update(range(new_start, new_start + new_count))
-                except (ValueError, IndexError):
-                    new_line = None
-            continue
-            
-        if new_line is not None:
+                    current_hunk = {
+                        'file': current_file,
+                        'start': new_start,
+                        'end': new_start + new_count - 1,
+                        'lines': set()
+                    }
+                    hunks.append(current_hunk)
+                except ValueError:
+                    current_hunk = None
+        elif current_hunk and new_line is not None:
             if line.startswith('+'):
-                # Track added lines
+                current_hunk['lines'].add(new_line)
                 new_line += 1
             elif line.startswith(' '):
-                # Track context lines
+                current_hunk['lines'].add(new_line)
                 new_line += 1
 
-    # Add final file
-    if current_file:
-        hunks.append({'file': current_file, 'lines': valid_lines})
-    
-    print(hunks)
-    print(hunks.type)
     return hunks
 
 def validate_comment(comment, hunks):
-    """Validate comment against actual diff lines with precise checking"""
+    """Validate comment stays within a single valid hunk"""
     for hunk in hunks:
         if hunk['file'] == comment['path']:
-            # Check if any line in the range exists in the diff
-            comment_lines = set(range(comment['start_line'], comment['end_line'] + 1))
-            if comment_lines & hunk['lines']:
+            # Check if both lines exist in the same hunk
+            start_ok = comment['start_line'] in hunk['lines']
+            end_ok = comment['end_line'] in hunk['lines']
+            
+            if start_ok and end_ok:
                 return {
                     'path': comment['path'],
                     'start_line': comment['start_line'],

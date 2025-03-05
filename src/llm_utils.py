@@ -5,6 +5,8 @@ from google.genai import types
 from google import genai
 from typing import List, Dict
 
+from github_utils import get_valid_hunks
+
 def analyze_code_changes(diff_content: str) -> List[Dict]:
     """
     Analyze code changes using OpenAI's GPT model
@@ -18,15 +20,18 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
         if not API_KEY:
             raise ValueError("GEMINI_API_KEY is not set. Please add it to your environment variables.")
 
+        hunks = get_valid_hunks(diff_content)
+
         # Prepare the prompt for the LLM
         prompt = f"""
         Analyze these code changes and provide feedback using EXACTLY this format:
 
         FILE: [file-path]
-        LINES: [start_line-end_line]  # MUST have start <= end and MUST be valid numbers
+        LINES: [start_line-end_line]  # MUST be within the same diff hunk
         COMMENT: [clear explanation]
         SUGGESTION: |
-        [exact code replacement OR N/A]
+        ```suggestion
+        [exact code replacement OR REMOVE_THIS_LINE_IF_NO_SUGGESTION]
 
         ---
         Example Valid Comment:
@@ -56,11 +61,11 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
         ---
 
         Rules:
-        1. Always use LINES: [start-end] format
-        2. Start <= End
-        3. Separate comments with ---
-        4. Use "N/A" for no suggestion
-        5. Suggestions must be properly indented
+        1.Never suggest changes spanning multiple hunks
+        2.Keep line ranges tight around actual changes
+        3.Verify line numbers exist in the diff below
+        4.Use exact line numbers from the diff
+        5.Seperate comments with ---
 
     Diff content:
     {diff_content}
@@ -76,7 +81,7 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
         #print(response.text)
         
         # Parse and format the response
-        review_comments = parse_llm_response(response.text)
+        review_comments = parse_llm_response(response.text,hunks)
         return review_comments
     except Exception as e:
         print(f"LLM analysis failed: {str(e)}")
@@ -84,7 +89,7 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
 
 
 
-def parse_llm_response(response: str) -> List[Dict]:
+def parse_llm_response(response: str, hunks: List[dict]) -> List[Dict]:
     review_comments = []
     
     for block in response.split('---'):
@@ -126,6 +131,19 @@ def parse_llm_response(response: str) -> List[Dict]:
                    isinstance(comment['end_line'], int),
                    comment['start_line'] <= comment['end_line']]):
             valid_block = False
+
+        # Additional hunk validation
+        valid_hunk = False
+        for hunk in hunks:
+            if (comment['path'] == hunk['file'] and
+                comment['start_line'] >= hunk['start'] and
+                comment['end_line'] <= hunk['end']):
+                valid_hunk = True
+                break
+                
+        if not valid_hunk:
+            print(f"Skipping cross-hunk comment: {comment['path']} {comment['start_line']}-{comment['end_line']}")
+            continue
 
         if valid_block:
             line_range = (f"Lines {comment['start_line']}-{comment['end_line']}" 
