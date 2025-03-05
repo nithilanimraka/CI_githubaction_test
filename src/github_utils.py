@@ -19,6 +19,7 @@ def get_pull_request_diff():
     # Get diff content
     diff_url = pull_request.diff_url
     response = requests.get(diff_url)
+    print(response.text)
     return response.text
 
 

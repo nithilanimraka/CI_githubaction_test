@@ -54,7 +54,7 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
         model="gemini-2.0-flash", contents=prompt
     )   
 
-    print(response.text)
+    #print(response.text)
     
     # Parse and format the response
     review_comments = parse_llm_response(response.text)
@@ -89,23 +89,29 @@ def parse_llm_response(response: str) -> List[Dict]:
         has_comment = False
         
         for line in block.split('\n'):
+
             line = line.strip()
+
             if line.startswith('FILE:'):
                 comment_data['path'] = line.split('FILE:', 1)[-1].strip()
                 has_file = True
+
             elif line.startswith('LINE:'):
                 try:
                     comment_data['line'] = int(line.split('LINE:', 1)[-1].strip())
                     has_line = True
                 except (ValueError, IndexError):
                     continue
+
             elif line.startswith('COMMENT:'):
                 comment_data['body'] += line.split('COMMENT:', 1)[-1].strip() + '\n'
                 has_comment = True
+
             elif line.startswith('SUGGESTION:'):
                 suggestion = line.split('SUGGESTION:', 1)[-1].strip()
                 if suggestion and suggestion != 'N/A':
                     comment_data['body'] += f"\n```suggestion\n{suggestion}\n```"
+
             elif line:
                 comment_data['body'] += line + '\n'
         
