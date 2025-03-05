@@ -26,7 +26,6 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
         LINES: [start_line-end_line]  # MUST have start <= end and MUST be valid numbers
         COMMENT: [clear explanation]
         SUGGESTION: |
-        ```suggestion
         [exact code replacement OR N/A]
 
         ---
@@ -46,6 +45,13 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
         LINES: 42-40  # ERROR: start > end
         COMMENT: Magic numbers present
         SUGGESTION: MAX_RETRIES = 3
+
+        ---
+        
+        Invalid Example (REJECTED):
+        FILE: src/app.py
+        LINES: invalid-numbers
+        COMMENT: This will be skipped
 
         ---
 
@@ -82,13 +88,17 @@ def parse_llm_response(response: str) -> List[Dict]:
     review_comments = []
     
     for block in response.split('---'):
-        lines = [line.rstrip() for line in block.split('\n') if line.strip()]
+        lines = [line.strip() for line in block.split('\n') if line.strip()]
         if not lines:
             continue
 
-        comment = {'path': None, 'start_line': None, 'end_line': None, 'body': []}
-        in_suggestion = False
-        suggestion_lines = []
+        comment = {
+            'path': None,
+            'start_line': None,
+            'end_line': None,
+            'body': []
+        }
+        valid_block = True
         
         for line in lines:
             if line.startswith('FILE:'):
@@ -100,40 +110,37 @@ def parse_llm_response(response: str) -> List[Dict]:
                     end = int(parts[1])
                     comment['start_line'], comment['end_line'] = sorted([start, end])
                 except (ValueError, IndexError):
-                    continue
+                    valid_block = False
             elif line.startswith('COMMENT:'):
                 comment['body'].append(line.split('COMMENT:', 1)[-1].strip())
             elif line.startswith('SUGGESTION:'):
-                in_suggestion = True
-                suggestion_lines = []
-            elif in_suggestion:
-                if line == '```':
-                    in_suggestion = False
-                    if suggestion_lines:
-                        comment['body'].append('```suggestion\n' + '\n'.join(suggestion_lines) + '\n```')
-                else:
-                    suggestion_lines.append(line)
-            else:
+                suggestion = line.split('SUGGESTION:', 1)[-1].strip()
+                if suggestion and suggestion != 'N/A':
+                    comment['body'].append(f'```suggestion\n{suggestion}\n```')
+            elif line:
                 comment['body'].append(line)
 
-        # Validation
-        if all([comment['path'],
-              isinstance(comment['start_line'], int),
-              isinstance(comment['end_line'], int),
-              comment['start_line'] <= comment['end_line']]):
-            
-            # Format body
-            line_range = (f"**Lines {comment['start_line']}-{comment['end_line']}:**\n" 
+        # Strict validation
+        if not all([comment['path'],
+                   isinstance(comment['start_line'], int),
+                   isinstance(comment['end_line'], int),
+                   comment['start_line'] <= comment['end_line']]):
+            valid_block = False
+
+        if valid_block:
+            line_range = (f"Lines {comment['start_line']}-{comment['end_line']}" 
                          if comment['start_line'] != comment['end_line'] 
-                         else f"**Line {comment['start_line']}:**\n")
+                         else f"Line {comment['start_line']}")
             
-            formatted_body = line_range + '\n'.join(comment['body'])
+            formatted_body = f"**{line_range}**\n" + '\n'.join(comment['body'])
             review_comments.append({
                 'path': comment['path'],
                 'start_line': comment['start_line'],
                 'end_line': comment['end_line'],
                 'body': formatted_body
             })
+        else:
+            print(f"Skipping invalid block: {block}")
     
     return review_comments
 
