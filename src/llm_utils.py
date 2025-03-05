@@ -34,7 +34,7 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
     try:
         db.connect()
     except ConnectionError as e:
-        logger.error(f"Connection failed: {e}")
+        logger.error(f"Connection failed: {{e}}")
 
     ---
     Invalid Example (REJECTED):
