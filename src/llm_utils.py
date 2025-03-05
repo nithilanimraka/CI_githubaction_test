@@ -20,40 +20,34 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
     Analyze these code changes and provide feedback using EXACTLY this format:
 
     FILE: [file-path]
-    LINES: [start_line-end_line]
-    COMMENT: [your comment]
+    LINES: [start_line-end_line]  # MUST have start <= end
+    COMMENT: [clear explanation]
     SUGGESTION: |
-    [code suggestion OR "N/A"]
+    [exact code replacement OR N/A]
 
     ---
-    Example 1 (single line):
-    FILE: src/app.py
-    LINES: 42-42
-    COMMENT: Avoid magic numbers
-    SUGGESTION: |
-    MAX_RETRIES = 3
-
-    Example 2 (multi-line):
+    Example Valid Comment:
     FILE: src/utils.py
     LINES: 15-18
-    COMMENT: Missing error handling
+    COMMENT: Missing error handling for database connection
     SUGGESTION: |
     try:
-        database.connect()
+        db.connect()
     except ConnectionError as e:
-        logger.error(f"Connection failed: {{e}}")
+        logger.error(f"Connection failed: {e}")
 
     ---
-    Rules:
-    1. Always use LINES: [start-end] format
-    2. Start <= End
-    3. Separate comments with ---
-    4. Use "N/A" for no suggestion
-    5. Suggestions must be properly indented
+    Invalid Example (REJECTED):
+    FILE: src/app.py
+    LINES: 42-40  # ERROR: start > end
+    COMMENT: Magic numbers present
+    SUGGESTION: MAX_RETRIES = 3
 
-Diff content:
-{diff_content}
-"""
+    ---
+
+    Diff content:
+    {diff_content}
+    """
 
     client = genai.Client(api_key=API_KEY)
 
@@ -75,18 +69,18 @@ def parse_llm_response(response: str) -> List[Dict]:
     for block in response.split('---'):
         lines = [line.strip() for line in block.split('\n') if line.strip()]
         comment = {'path': None, 'start_line': None, 'end_line': None, 'body': []}
-        in_suggestion = False
+        current_field = None
         
         for line in lines:
             if line.startswith('FILE:'):
                 comment['path'] = line.split('FILE:', 1)[-1].strip()
             elif line.startswith('LINES:'):
                 try:
-                    start_end = line.split('LINES:', 1)[-1].strip().split('-')
-                    comment['start_line'] = int(start_end[0])
-                    comment['end_line'] = int(start_end[1])
-                    if comment['start_line'] > comment['end_line']:
-                        comment['start_line'], comment['end_line'] = comment['end_line'], comment['start_line']
+                    parts = line.split('LINES:', 1)[-1].strip().split('-')
+                    start = int(parts[0])
+                    end = int(parts[1])
+                    # Enforce start <= end
+                    comment['start_line'], comment['end_line'] = sorted([start, end])
                 except (ValueError, IndexError):
                     continue
             elif line.startswith('COMMENT:'):
@@ -94,22 +88,28 @@ def parse_llm_response(response: str) -> List[Dict]:
             elif line.startswith('SUGGESTION:'):
                 suggestion = line.split('SUGGESTION:', 1)[-1].strip()
                 if suggestion and suggestion != 'N/A':
-                    comment['body'].append('```suggestion\n' + suggestion + '\n```')
-            elif line.startswith('```'):
-                in_suggestion = not in_suggestion
-                if in_suggestion:
-                    comment['body'].append('```suggestion')
-                else:
-                    comment['body'].append('```')
-            elif in_suggestion:
-                comment['body'][-1] += '\n' + line
+                    comment['body'].append(f'```suggestion\n{suggestion}\n```')
             elif line:
                 comment['body'].append(line)
         
-        # Validation
-        if all([comment['path'], comment['start_line'], comment['end_line']]):
-            comment['body'] = '\n'.join(comment['body'])
-            review_comments.append(comment)
+        # Final validation
+        if all([comment['path'], 
+               comment['start_line'] is not None,
+               comment['end_line'] is not None,
+               comment['start_line'] <= comment['end_line']]):
+            
+            # Format comment body
+            line_range = (f"Lines {comment['start_line']}-{comment['end_line']}" 
+                         if comment['start_line'] != comment['end_line'] 
+                         else f"Line {comment['start_line']}")
+            
+            formatted_body = f"**{line_range}**\n" + '\n'.join(comment['body'])
+            review_comments.append({
+                'path': comment['path'],
+                'start_line': comment['start_line'],
+                'end_line': comment['end_line'],
+                'body': formatted_body
+            })
     
     return review_comments
 
