@@ -1,11 +1,11 @@
-import json
 import os
 import requests
 from github import Github
+import json 
 
 def get_pull_request_diff():
     """Fetch the pull request diff content from GitHub"""
-    g = Github(os.getenv('GIT_TOKEN'))
+    g = Github(os.getenv('GITHUB_TOKEN'))
 
     # Parse GitHub event context
     event_path = os.getenv('GITHUB_EVENT_PATH')
@@ -19,9 +19,7 @@ def get_pull_request_diff():
     # Get diff content
     diff_url = pull_request.diff_url
     response = requests.get(diff_url)
-    print(response.text)
     return response.text
-
 
 def post_review_comment(comment):
     """Post a review comment back to the pull request"""
@@ -41,4 +39,4 @@ def post_review_comment(comment):
         commit_id=comment['commit_id'],
         path=comment['path'],
         position=comment['position']
-    )
+	    )
