@@ -70,13 +70,13 @@ Posting can be done later when logs are correct and accurate. The line numbers a
 def post_review_comment(comments, diff_content):
     """Post validated review comments to GitHub"""
     g = Github(os.getenv('GIT_TOKEN'))
-    
+
     # Load GitHub event data
     event_path = os.getenv('GITHUB_EVENT_PATH')
     with open(event_path, 'r') as f:
         event_data = json.load(f)
 
-    # Get repository details
+    # Get repository and PR details
     repo = g.get_repo(event_data['repository']['full_name'])
     pr_number = event_data['pull_request']['number']
     pull_request = repo.get_pull(pr_number)
@@ -85,45 +85,48 @@ def post_review_comment(comments, diff_content):
     # Get valid lines from diff
     valid_lines = get_valid_lines(diff_content)
     
-    # Prepare GitHub-compatible comments
-    github_comments = []
+    # Prepare filtered comments
+    filtered_comments = []
     for comment in comments:
-        try:
-            file_path = comment['path']
-            line_num = comment['line']
-            body = comment['body']
-            
-            # Validate against actual diff
-            if (file_path in valid_lines and 
-                line_num in valid_lines[file_path] and 
-                len(body) > 0):
-                
-                github_comments.append({
-                    "path": file_path,
-                    "position": line_num,
-                    "body": body
-                })
-                
-        except KeyError as e:
-            print(f"Skipping invalid comment structure: {e}")
+
+        # Ensure we're dealing with a dictionary
+        if not isinstance(comment, dict):
+            print(f"Skipping invalid comment type: {type(comment)}")
             continue
 
-    if not github_comments:
-        print("No valid comments to post after validation")
+        try:
+            file_path = comment['path']
+            line_num = comment.get('line', 1)
+            
+            # Validate against actual diff
+            if file_path in valid_lines and line_num in valid_lines[file_path]:
+                filtered_comments.append({
+                    "path": file_path,
+                    "position": line_num,  # GitHub expects 'position' not 'line'
+                    "body": comment['body']
+                })
+            else:
+                print(f"Skipping invalid comment - File: {file_path}, Line: {line_num}")
+                
+        except KeyError as e:
+            print(f"Skipping malformed comment: {comment} - Missing key: {e}")
+
+    if not filtered_comments:
+        print("No valid comments to post after filtering")
         return
 
     try:
         # Create review with valid comments
-        review = pull_request.create_review(
+        pull_request.create_review(
             commit=repo.get_commit(head_sha),
             body="AI Code Review Summary",
-            comments=github_comments,
+            comments=filtered_comments,
             event="COMMENT"
         )
-        print(f"Successfully posted {len(github_comments)} comments")
-        print(f"Review URL: {review.html_url}")
+        print(f"Successfully posted {len(filtered_comments)} comments")
         
     except Exception as e:
         print(f"Failed to post comments: {str(e)}")
         if hasattr(e, 'data'):
-            print(f"GitHub API error details: {json.dumps(e.data, indent=2)}")
+            print(f"Error details: {json.dumps(e.data, indent=2)}")
+        print("Problematic comments structure:", json.dumps(filtered_comments[:2], indent=2))
