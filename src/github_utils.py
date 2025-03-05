@@ -24,42 +24,55 @@ def get_pull_request_diff():
 
 
 def get_valid_lines(diff_content):
-    """Parse diff to find valid line numbers with proper initialization"""
+    """Parse diff to find valid line numbers in the new file version"""
     valid_lines = {}
     current_file = None
-    line_number = None
-    
+    new_file_line = None  # Tracks line numbers in the new file
+    hunk_lines = 0  # Tracks number of lines processed in current hunk
+
     for line in diff_content.split('\n'):
-        # Reset tracking for new files
+        # Start of new file diff
         if line.startswith('diff --git'):
-            current_file = line.split(' b/')[-1].strip()
+            current_file = line.split(' b/')[-1].split()[0]
             valid_lines[current_file] = set()
-            line_number = None  # Reset for new file
+            new_file_line = None
+            hunk_lines = 0
             continue
-            
-        # Parse hunk header
+
+        # Hunk header - format: @@ -old_start,old_lines +new_start,new_lines @@
         if line.startswith('@@'):
             try:
-                # Extract new file line number (after +)
-                hunk_header = line.split('+', 1)[1].split(' ', 1)[0]
-                line_number = int(hunk_header.split(',')[0])
-                valid_lines[current_file].add(line_number)
+                # Extract new file line information
+                new_part = line.split('+')[1].split(' ', 1)[0]
+                new_start = int(new_part.split(',')[0])
+                new_file_line = new_start
+                hunk_lines = 0
+                valid_lines[current_file].add(new_file_line)
             except (IndexError, ValueError):
-                line_number = None  # Invalid hunk format
+                new_file_line = None
             continue
-            
-        # Only process lines if we have valid line_number
-        if line_number is None:
-            continue
-            
-        # Track added lines
+
+        if new_file_line is None:
+            continue  # Skip lines before valid hunk header
+
+        # Track line types
         if line.startswith('+'):
-            valid_lines[current_file].add(line_number)
-            line_number += 1
-        # Track context lines (non-diff lines)
+            # Added line - valid for commenting
+            valid_lines[current_file].add(new_file_line)
+            new_file_line += 1
+            hunk_lines += 1
         elif line.startswith(' '):
-            line_number += 1
-            
+            # Context line - valid for commenting
+            valid_lines[current_file].add(new_file_line)
+            new_file_line += 1
+            hunk_lines += 1
+        elif line.startswith('-'):
+            # Deleted line - only exists in old file, don't increment new line
+            hunk_lines += 1
+        else:
+            # Other diff control lines
+            continue
+
     return valid_lines
 
 
