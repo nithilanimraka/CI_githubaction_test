@@ -28,16 +28,11 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
     Example:
 
     FILE: src/app.py
-    LINE: 42 - 46
+    LINES: 42 - 46
     COMMENT: Avoid magic numbers, consider using a constant
     SUGGESTION: MAX_RETRIES = 3
 
     ---
-
-    FILE: src/main.py
-    LINE: 1
-    COMMENT: Remove unused imports
-    SUGGESTION: Remove import numpy as py
 
     Make sure to insert '---' in between two review comments. IT IS A MUST!!!
 
