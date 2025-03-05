@@ -47,7 +47,7 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
         SUGGESTION: MAX_RETRIES = 3
 
         ---
-        
+
         Invalid Example (REJECTED):
         FILE: src/app.py
         LINES: invalid-numbers
@@ -73,7 +73,7 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
             model="gemini-2.0-flash", contents=prompt
         )   
 
-        print(response.text)
+        #print(response.text)
         
         # Parse and format the response
         review_comments = parse_llm_response(response.text)
