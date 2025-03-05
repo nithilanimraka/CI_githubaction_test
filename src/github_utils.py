@@ -22,7 +22,7 @@ def get_pull_request_diff():
     #print(response.text)
     return response.text
 
-
+#working code
 def get_valid_hunks(diff_content):
     """Parse diff to track valid line ranges with precise tracking"""
     hunks = []
