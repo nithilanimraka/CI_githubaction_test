@@ -89,21 +89,13 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
 
 
 
-def parse_llm_response(response: str, hunks: List[dict]) -> List[Dict]:
+def parse_llm_response(response: str) -> List[Dict]:
     review_comments = []
     
     for block in response.split('---'):
         lines = [line.strip() for line in block.split('\n') if line.strip()]
-        if not lines:
-            continue
-
-        comment = {
-            'path': None,
-            'start_line': None,
-            'end_line': None,
-            'body': []
-        }
-        valid_block = True
+        comment = {'path': None, 'start_line': None, 'end_line': None, 'body': []}
+        valid = True
         
         for line in lines:
             if line.startswith('FILE:'):
@@ -113,50 +105,32 @@ def parse_llm_response(response: str, hunks: List[dict]) -> List[Dict]:
                     parts = line.split('LINES:', 1)[-1].strip().split('-')
                     start = int(parts[0])
                     end = int(parts[1])
-                    comment['start_line'], comment['end_line'] = sorted([start, end])
+                    if start > end:
+                        start, end = end, start
+                    comment['start_line'] = start
+                    comment['end_line'] = end
                 except (ValueError, IndexError):
-                    valid_block = False
+                    valid = False
             elif line.startswith('COMMENT:'):
                 comment['body'].append(line.split('COMMENT:', 1)[-1].strip())
             elif line.startswith('SUGGESTION:'):
                 suggestion = line.split('SUGGESTION:', 1)[-1].strip()
-                if suggestion and suggestion != 'N/A':
+                if suggestion:
                     comment['body'].append(f'```suggestion\n{suggestion}\n```')
             elif line:
                 comment['body'].append(line)
 
-        # Strict validation
-        if not all([comment['path'],
-                   isinstance(comment['start_line'], int),
-                   isinstance(comment['end_line'], int),
-                   comment['start_line'] <= comment['end_line']]):
-            valid_block = False
+        # Final validation
+        if not all([
+            isinstance(comment['start_line'], int),
+            isinstance(comment['end_line'], int),
+            comment['start_line'] <= comment['end_line'],
+            comment['path'] is not None
+        ]):
+            valid = False
 
-        # Additional hunk validation
-        valid_hunk = False
-        for hunk in hunks:
-            if (comment['path'] == hunk['file'] and
-                comment['start_line'] >= hunk['start'] and
-                comment['end_line'] <= hunk['end']):
-                valid_hunk = True
-                break
-                
-        if not valid_hunk:
-            print(f"Skipping cross-hunk comment: {comment['path']} {comment['start_line']}-{comment['end_line']}")
-            continue
-
-        if valid_block:
-            line_range = (f"Lines {comment['start_line']}-{comment['end_line']}" 
-                         if comment['start_line'] != comment['end_line'] 
-                         else f"Line {comment['start_line']}")
-            
-            formatted_body = f"**{line_range}**\n" + '\n'.join(comment['body'])
-            review_comments.append({
-                'path': comment['path'],
-                'start_line': comment['start_line'],
-                'end_line': comment['end_line'],
-                'body': formatted_body
-            })
+        if valid:
+            review_comments.append(comment)
         else:
             print(f"Skipping invalid block: {block}")
     

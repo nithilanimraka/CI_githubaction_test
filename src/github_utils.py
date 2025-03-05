@@ -24,60 +24,46 @@ def get_pull_request_diff():
 
 
 def get_valid_hunks(diff_content):
-    """Parse diff to track valid line ranges per hunk"""
+    """Parse diff to track valid line ranges with precise hunk tracking"""
     hunks = []
     current_file = None
     current_hunk = None
-    new_line = None
-
+    
     for line in diff_content.split('\n'):
         if line.startswith('diff --git'):
             current_file = line.split(' b/')[1].split()[0]
+            current_hunk = None
         elif line.startswith('@@'):
-            parts = line.split('+')
-            if len(parts) > 1:
-                new_part = parts[1].split()[0].split(',')
-                try:
-                    new_start = int(new_part[0])
-                    new_count = int(new_part[1]) if len(new_part) > 1 else 1
-                    new_line = new_start
-                    current_hunk = {
-                        'file': current_file,
-                        'start': new_start,
-                        'end': new_start + new_count - 1,
-                        'lines': set()
-                    }
-                    hunks.append(current_hunk)
-                except ValueError:
-                    current_hunk = None
-        elif current_hunk and new_line is not None:
-            if line.startswith('+'):
-                current_hunk['lines'].add(new_line)
-                new_line += 1
-            elif line.startswith(' '):
-                current_hunk['lines'].add(new_line)
-                new_line += 1
-
+            try:
+                parts = line.split('+')[1].split()[0].split(',')
+                new_start = int(parts[0])
+                new_count = int(parts[1]) if len(parts) > 1 else 1
+                current_hunk = {
+                    'file': current_file,
+                    'start': new_start,
+                    'end': new_start + new_count - 1,
+                    'lines': set(range(new_start, new_start + new_count))
+                }
+                hunks.append(current_hunk)
+            except (ValueError, IndexError):
+                current_hunk = None
     return hunks
 
 def validate_comment(comment, hunks):
     """Validate comment stays within a single valid hunk"""
     for hunk in hunks:
-        if hunk['file'] == comment['path']:
-            # Check if both lines exist in the same hunk
-            start_ok = comment['start_line'] in hunk['lines']
-            end_ok = comment['end_line'] in hunk['lines']
-            
-            if start_ok and end_ok:
-                return {
-                    'path': comment['path'],
-                    'start_line': comment['start_line'],
-                    'line': comment['end_line'],
-                    'body': comment['body'],
-                    'start_side': 'RIGHT',
-                    'side': 'RIGHT'
-                }
-    print(f"Invalid range: {comment['path']} {comment['start_line']}-{comment['end_line']}")
+        if (hunk['file'] == comment['path'] and
+            comment['start_line'] >= hunk['start'] and
+            comment['end_line'] <= hunk['end']):
+            return {
+                'path': comment['path'],
+                'start_line': comment['start_line'],
+                'line': comment['end_line'],
+                'body': comment['body'],
+                'start_side': 'RIGHT',
+                'side': 'RIGHT'
+            }
+    print(f"Skipping invalid: {comment['path']} {comment['start_line']}-{comment['end_line']}")
     return None
 
 
@@ -94,27 +80,37 @@ def post_review_comment(comments, diff_content):
     head_sha = event_data['pull_request']['head']['sha']
     
     hunks = get_valid_hunks(diff_content)
-    valid_comments = []
+    filtered_comments = []
     
     for comment in comments:
         validated = validate_comment(comment, hunks)
         if validated:
-            valid_comments.append(validated)
+            filtered_comments.append(validated)
         else:
             print(f"Skipping invalid: {comment['path']} {comment['start_line']}-{comment['end_line']}")
     
-    if valid_comments:
-        try:
-            pr.create_review(
-                commit=repo.get_commit(head_sha),
-                body="AI Code Review Summary",
-                comments=valid_comments,
-                event="COMMENT"
-            )
-            print(f"Successfully posted {len(valid_comments)} comments")
-        except Exception as e:
-            print(f"Failed to post comments: {str(e)}")
-            if hasattr(e, 'data'):
-                print("Error details:", json.dumps(e.data, indent=2))
+    valid_comments = []
+    for comment in filtered_comments:
+        if (comment['start_line'] <= comment['line'] and  # GitHub API requirement
+            comment['path'] in [h['file'] for h in hunks]):
+            valid_comments.append(comment)
+    
+    if not valid_comments:
+        print("No valid comments after final validation")
+        return
+
+    try:
+        # Create review with valid comments
+        review = pr.create_review(
+            commit=repo.get_commit(head_sha),
+            body="AI Code Review Summary",
+            comments=valid_comments,
+            event="COMMENT"
+        )
+        print(f"Successfully posted {len(valid_comments)} comments")
+    except Exception as e:
+        print(f"Failed to post comments: {str(e)}")
+        if hasattr(e, 'data'):
+            print("Error details:", json.dumps(e.data, indent=2))
     else:
         print("No valid comments to post")
