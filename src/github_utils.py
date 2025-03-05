@@ -69,6 +69,7 @@ def get_valid_hunks(diff_content):
         hunks.append({'file': current_file, 'lines': valid_lines})
     
     print(hunks)
+    print(hunks.type)
     return hunks
 
 def validate_comment(comment, hunks):
