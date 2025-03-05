@@ -23,57 +23,52 @@ def get_pull_request_diff():
     return response.text
 
 
-def get_valid_lines(diff_content):
-    """Parse diff to find valid line numbers in the new file version"""
-    valid_lines = {}
+def get_valid_hunks(diff_content):
+    """Parse diff to find valid hunk positions"""
+    hunks = []
+    current_hunk = None
     current_file = None
-    new_file_line = None  # Tracks line numbers in the new file
-    hunk_lines = 0  # Tracks number of lines processed in current hunk
-
+    
     for line in diff_content.split('\n'):
-        # Start of new file diff
         if line.startswith('diff --git'):
-            current_file = line.split(' b/')[-1].split()[0]
-            valid_lines[current_file] = set()
-            new_file_line = None
-            hunk_lines = 0
-            continue
+            # New file section
+            current_file = line.split(' b/')[1].split()[0]
+        elif line.startswith('@@'):
+            # Hunk header format: @@ -old_start,old_lines +new_start,new_lines @@
+            parts = line.split(' ')
+            new_part = parts[2].split(',')
+            new_start = int(new_part[0][1:])
+            hunk_length = int(new_part[1])
+            
+            current_hunk = {
+                'file': current_file,
+                'new_start': new_start,
+                'new_end': new_start + hunk_length - 1,
+                'lines': []
+            }
+            hunks.append(current_hunk)
+        elif current_hunk and line.startswith(('+', ' ')):
+            # Track valid lines in hunk (additions and context)
+            current_hunk['lines'].append({
+                'content': line,
+                'new_line': current_hunk['new_start'] + len(current_hunk['lines'])
+            })
+    
+    return hunks
 
-        # Hunk header - format: @@ -old_start,old_lines +new_start,new_lines @@
-        if line.startswith('@@'):
-            try:
-                # Extract new file line information
-                new_part = line.split('+')[1].split(' ', 1)[0]
-                new_start = int(new_part.split(',')[0])
-                new_file_line = new_start
-                hunk_lines = 0
-                valid_lines[current_file].add(new_file_line)
-            except (IndexError, ValueError):
-                new_file_line = None
-            continue
 
-        if new_file_line is None:
-            continue  # Skip lines before valid hunk header
-
-        # Track line types
-        if line.startswith('+'):
-            # Added line - valid for commenting
-            valid_lines[current_file].add(new_file_line)
-            new_file_line += 1
-            hunk_lines += 1
-        elif line.startswith(' '):
-            # Context line - valid for commenting
-            valid_lines[current_file].add(new_file_line)
-            new_file_line += 1
-            hunk_lines += 1
-        elif line.startswith('-'):
-            # Deleted line - only exists in old file, don't increment new line
-            hunk_lines += 1
-        else:
-            # Other diff control lines
-            continue
-
-    return valid_lines
+def validate_comment(comment, hunks):
+    """Validate comment against actual diff hunks"""
+    for hunk in hunks:
+        if hunk['file'] == comment['path']:
+            for line in hunk['lines']:
+                if line['new_line'] == comment['line']:
+                    return {
+                        'path': comment['path'],
+                        'position': hunk['lines'].index(line) + 1,  # GitHub's 1-based hunk position
+                        'body': comment['body']
+                    }
+    return None
 
 
 
@@ -92,51 +87,29 @@ def post_review_comment(comments, diff_content):
     pull_request = repo.get_pull(pr_number)
     head_sha = event_data['pull_request']['head']['sha']
 
-    # Get valid lines from diff
-    valid_lines = get_valid_lines(diff_content)
+    # Parse hunks from diff
+    hunks = get_valid_hunks(diff_content)
     
-    # Prepare filtered comments
-    filtered_comments = []
+    # Validate comments against hunks
+    valid_comments = []
     for comment in comments:
+        validated = validate_comment(comment, hunks)
+        if validated:
+            valid_comments.append(validated)
+        else:
+            print(f"Skipping invalid comment - File: {comment['path']}, Line: {comment['line']}")
 
-        # Ensure we're dealing with a dictionary
-        if not isinstance(comment, dict):
-            print(f"Skipping invalid comment type: {type(comment)}")
-            continue
-
-        try:
-            file_path = comment['path']
-            line_num = comment.get('line', 1)
-            
-            # Validate against actual diff
-            if file_path in valid_lines and line_num in valid_lines[file_path]:
-                filtered_comments.append({
-                    "path": file_path,
-                    "position": line_num,  # GitHub expects 'position' not 'line'
-                    "body": comment['body']
-                })
-            else:
-                print(f"Skipping invalid comment - File: {file_path}, Line: {line_num}")
-                
-        except KeyError as e:
-            print(f"Skipping malformed comment: {comment} - Missing key: {e}")
-
-    if not filtered_comments:
-        print("No valid comments to post after filtering")
+    if not valid_comments:
+        print("No valid comments to post")
         return
 
+    # Post comments using GitHub's API
     try:
-        # Create review with valid comments
         pull_request.create_review(
             commit=repo.get_commit(head_sha),
             body="AI Code Review Summary",
-            comments=filtered_comments,
+            comments=valid_comments,
             event="COMMENT"
         )
-        print(f"Successfully posted {len(filtered_comments)} comments")
-        
     except Exception as e:
         print(f"Failed to post comments: {str(e)}")
-        if hasattr(e, 'data'):
-            print(f"Error details: {json.dumps(e.data, indent=2)}")
-        print("Problematic comments structure:", json.dumps(filtered_comments[:2], indent=2))
