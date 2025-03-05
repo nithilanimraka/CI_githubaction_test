@@ -81,7 +81,7 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
         #print(response.text)
         
         # Parse and format the response
-        review_comments = parse_llm_response(response.text,hunks)
+        review_comments = parse_llm_response(response.text)
         return review_comments
     except Exception as e:
         print(f"LLM analysis failed: {str(e)}")
