@@ -45,9 +45,16 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
 
     ---
 
-    Diff content:
-    {diff_content}
-    """
+    Rules:
+    1. Always use LINES: [start-end] format
+    2. Start <= End
+    3. Separate comments with ---
+    4. Use "N/A" for no suggestion
+    5. Suggestions must be properly indented
+
+Diff content:
+{diff_content}
+"""
 
     client = genai.Client(api_key=API_KEY)
 
