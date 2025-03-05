@@ -20,15 +20,14 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
     Analyze the following code changes and provide review comments using EXACTLY this format:
 
     FILE: [file-path]
-    LINES: [line-numbers]
+    LINE: [line-number]
     COMMENT: [your comment]
     SUGGESTION: [optional suggested code]
 
     ---
     Example:
-
     FILE: src/app.py
-    LINES: 42 - 46
+    LINE: 42
     COMMENT: Avoid magic numbers, consider using a constant
     SUGGESTION: MAX_RETRIES = 3
 
