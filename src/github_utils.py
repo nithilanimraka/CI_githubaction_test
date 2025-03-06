@@ -1,5 +1,6 @@
 import json
 import os
+from typing import List, Optional
 import requests
 from github import Github
 
@@ -23,34 +24,41 @@ def get_pull_request_diff():
     return response.text
 
 
-def get_valid_hunks(diff_content):
-    """Parse diff to track valid line ranges with precise hunk tracking"""
+def get_valid_hunks(diff_content: str) -> List[dict]:
+    """Parse diff content with precise line tracking"""
     hunks = []
     current_file = None
-    current_hunk = None
+    new_line = None
     
     for line in diff_content.split('\n'):
         if line.startswith('diff --git'):
             current_file = line.split(' b/')[1].split()[0]
-            current_hunk = None
+            new_line = None
         elif line.startswith('@@'):
             try:
-                parts = line.split('+')[1].split()[0].split(',')
-                new_start = int(parts[0])
-                new_count = int(parts[1]) if len(parts) > 1 else 1
-                current_hunk = {
+                # Extract new file range from hunk header
+                new_range = line.split('+')[1].split()[0].split(',')
+                new_start = int(new_range[0])
+                new_line_count = int(new_range[1]) if len(new_range) > 1 else 1
+                new_line = new_start
+                hunks.append({
                     'file': current_file,
                     'start': new_start,
-                    'end': new_start + new_count - 1,
-                    'lines': set(range(new_start, new_start + new_count))
-                }
-                hunks.append(current_hunk)
-            except (ValueError, IndexError):
-                current_hunk = None
+                    'end': new_start + new_line_count - 1,
+                    'lines': set(range(new_start, new_start + new_line_count))
+                })
+            except (IndexError, ValueError):
+                new_line = None
+        elif new_line is not None:
+            if line.startswith('+'):
+                new_line += 1
+            elif line.startswith(' '):
+                new_line += 1
+                
     return hunks
 
-def validate_comment(comment, hunks):
-    """Validate comment stays within a single valid hunk"""
+def validate_comment(comment: dict, hunks: List[dict]) -> Optional[dict]:
+    """Validate comment against actual diff hunks"""
     for hunk in hunks:
         if (hunk['file'] == comment['path'] and
             comment['start_line'] >= hunk['start'] and
@@ -63,9 +71,8 @@ def validate_comment(comment, hunks):
                 'start_side': 'RIGHT',
                 'side': 'RIGHT'
             }
-    print(f"Skipping invalid: {comment['path']} {comment['start_line']}-{comment['end_line']}")
+    print(f"Invalid range: {comment['path']} {comment['start_line']}-{comment['end_line']}")
     return None
-
 
 
 def post_review_comment(comments, diff_content):

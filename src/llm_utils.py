@@ -30,8 +30,7 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
         LINES: [start_line-end_line]  # MUST be within the same diff hunk
         COMMENT: [clear explanation]
         SUGGESTION: |
-        ```suggestion
-        [exact code replacement OR REMOVE_THIS_LINE_IF_NO_SUGGESTION]
+        [exact code replacement OR N/A]
 
         ---
         Example Valid Comment:
@@ -45,31 +44,22 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
             logger.error(f"Connection failed: {{e}}")
 
         ---
-        Invalid Example (REJECTED):
-        FILE: src/app.py
-        LINES: 42-40  # ERROR: start > end
-        COMMENT: Magic numbers present
-        SUGGESTION: MAX_RETRIES = 3
-
-        ---
-
-        Invalid Example (REJECTED):
-        FILE: src/app.py
-        LINES: invalid-numbers
+        Invalid Example (will be rejected):
+        FILE: src/utils.py
+        LINES: fifteen-eighteen
         COMMENT: This will be skipped
 
         ---
 
-        Rules:
-        1.Never suggest changes spanning multiple hunks
-        2.Keep line ranges tight around actual changes
-        3.Verify line numbers exist in the diff below
-        4.Use exact line numbers from the diff
-        5.Seperate comments with ---
+        Important Rules:
+        1. Never include code snippets in COMMENT
+        2. Always verify line numbers exist in the diff
+        3. Keep suggestions focused on changed lines
+        4. Use exactly one '---' between comments
 
-    Diff content:
-    {diff_content}
-    """
+        Diff content:
+        {diff_content}
+        """
 
         client = genai.Client(api_key=API_KEY)
 
@@ -82,6 +72,7 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
         
         # Parse and format the response
         review_comments = parse_llm_response(response.text)
+        print(f"Parsed {len(review_comments)} valid comments")
         return review_comments
     except Exception as e:
         print(f"LLM analysis failed: {str(e)}")
@@ -90,13 +81,23 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
 
 
 def parse_llm_response(response: str) -> List[Dict]:
+    """Parse LLM response with strict validation"""
     review_comments = []
     
     for block in response.split('---'):
         lines = [line.strip() for line in block.split('\n') if line.strip()]
-        comment = {'path': None, 'start_line': None, 'end_line': None, 'body': []}
+        if not lines:
+            continue
+
+        comment = {
+            'path': None,
+            'start_line': None,
+            'end_line': None,
+            'body': []
+        }
         valid = True
         
+        # Parse block
         for line in lines:
             if line.startswith('FILE:'):
                 comment['path'] = line.split('FILE:', 1)[-1].strip()
@@ -105,34 +106,35 @@ def parse_llm_response(response: str) -> List[Dict]:
                     parts = line.split('LINES:', 1)[-1].strip().split('-')
                     start = int(parts[0])
                     end = int(parts[1])
-                    if start > end:
-                        start, end = end, start
-                    comment['start_line'] = start
-                    comment['end_line'] = end
+                    comment['start_line'], comment['end_line'] = sorted([start, end])
                 except (ValueError, IndexError):
                     valid = False
             elif line.startswith('COMMENT:'):
                 comment['body'].append(line.split('COMMENT:', 1)[-1].strip())
             elif line.startswith('SUGGESTION:'):
                 suggestion = line.split('SUGGESTION:', 1)[-1].strip()
-                if suggestion:
+                if suggestion and suggestion != 'N/A':
                     comment['body'].append(f'```suggestion\n{suggestion}\n```')
-            elif line:
+            else:
                 comment['body'].append(line)
 
-        # Final validation
+        # Validate required fields
         if not all([
+            comment['path'],
             isinstance(comment['start_line'], int),
             isinstance(comment['end_line'], int),
-            comment['start_line'] <= comment['end_line'],
-            comment['path'] is not None
+            comment['start_line'] <= comment['end_line']
         ]):
             valid = False
 
         if valid:
-            review_comments.append(comment)
+            review_comments.append({
+                'path': comment['path'],
+                'start_line': comment['start_line'],
+                'end_line': comment['end_line'],
+                'body': '\n'.join(comment['body'])
+            })
         else:
-            print(f"Skipping invalid block: {block}")
+            print(f"Skipping invalid block:\n{block}")
     
     return review_comments
-
