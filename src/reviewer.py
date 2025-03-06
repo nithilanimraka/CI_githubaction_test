@@ -8,7 +8,7 @@ class AICodeReviewer:
 
     def review_pull_request(self):
         diff_content, head_commit_sha, pr = get_pull_request_diff()
-        review_comments = analyze_code_changes(diff_content, head_commit_sha)
+        review_comments = analyze_code_changes(diff_content)
         
         for comment in review_comments:
             post_review_comment(comment, pr)

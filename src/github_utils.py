@@ -1,10 +1,10 @@
 # github_utils.py (updated)
 
 import os
-from typing import Dict
 import requests
 import json
 from github import Github
+from typing import Dict
 
 def get_pull_request_diff():
     """Fetch diff content and PR metadata"""
@@ -21,16 +21,18 @@ def get_pull_request_diff():
         pr.head.sha,
         pr
     )
-# commit=repo.get_commit(head_sha),
 
 def post_review_comment(comment: Dict, pull_request):
-    """Post comment using GitHub API"""
+    """Post comment using GitHub API with correct parameters"""
     try:
-        pull_request.create_review(
+        # Remove 'b/' prefix from path that appears in diff output
+        clean_path = comment['path'].lstrip('b/')
+        
+        pull_request.create_review_comment(
             body=comment['body'],
-            commit=comment['commit_id'],
-            path=comment['path'],
-            event="COMMENT"
+            path=clean_path,
+            position=comment['position'],
+            commit_id=pull_request.head.sha  # Use the PR's head SHA directly
         )
     except Exception as e:
         print(f"Failed to post comment: {str(e)}")

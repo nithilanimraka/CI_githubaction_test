@@ -56,24 +56,24 @@ def analyze_code_changes(diff_content: str, head_commit_sha: str) -> List[Dict]:
 
     return comments
 
-def parse_llm_response(response: str, valid_lines: List[tuple], file_path: str, commit_sha: str) -> List[Dict]:
+def parse_llm_response(response: str, valid_lines: List[tuple], file_path: str) -> List[Dict]:
     """
     Parse LLM response into GitHub comment format
-    valid_lines: List of (position, Line) tuples from the hunk
     """
     comments = []
     line_pattern = re.compile(r'Line\s+(\d+):\s*(.+)')
+
+    # Remove 'b/' prefix from path
+    clean_path = file_path.lstrip('b/')
 
     for match in line_pattern.findall(response):
         line_num_str, comment_text = match
         try:
             line_num = int(line_num_str)
-            # Validate line number exists in added lines
             if any(line_num == pos for pos, _ in valid_lines):
                 comments.append({
                     'body': f"🤖 AI Review: {comment_text}",
-                    'path': file_path,
-                    'commit_id': commit_sha,
+                    'path': clean_path,
                     'position': line_num
                 })
         except ValueError:
