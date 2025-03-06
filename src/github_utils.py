@@ -30,7 +30,7 @@ def post_review_comment(comment: Dict, pull_request):
             body=comment['body'],
             commit=comment['commit_id'],
             path=comment['path'],
-            position=comment['position']
+            event = 'COMMENT'
         )
     except Exception as e:
         print(f"Failed to post comment: {str(e)}")
