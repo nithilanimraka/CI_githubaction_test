@@ -54,7 +54,8 @@ def get_valid_hunks(diff_content: str) -> List[dict]:
                 new_line += 1
             elif line.startswith(' '):
                 new_line += 1
-                
+
+    print(hunks)            
     return hunks
 
 def validate_comment(comment: dict, hunks: List[dict]) -> Optional[dict]:

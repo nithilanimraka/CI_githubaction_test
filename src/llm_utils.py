@@ -139,5 +139,4 @@ def parse_llm_response(response: str) -> List[Dict]:
         else:
             print(f"Skipping invalid block:\n{block}")
     
-    print(review_comments)
     return review_comments
