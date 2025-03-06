@@ -1,6 +1,7 @@
 # github_utils.py (updated)
 
 import os
+import github
 import requests
 import json
 from github import Github
@@ -22,17 +23,19 @@ def get_pull_request_diff():
         pr
     )
 
-def post_review_comment(comment: Dict, pull_request):
+def post_review_comment(comment: Dict, pull_request, head_commit_sha):
     """Post comment using GitHub API with correct parameters"""
     try:
-        # Remove 'b/' prefix from path that appears in diff output
-        clean_path = comment['path'].lstrip('b/')
-        
-        pull_request.create_review_comment(
-            body=comment['body'],
-            path=clean_path,
-            position=comment['position'],
-            commit_id=pull_request.head.sha  # Use the PR's head SHA directly
+        # GitHub API requires line number instead of position
+        pull_request.create_review(
+            commit=github.Commit.Commit(pull_request.repository, head_commit_sha),
+            body="🤖 AI Code Review",
+            event="COMMENT",
+            comments=[{
+                'path': comment['path'].lstrip('b/'),
+                'body': comment['body'],
+                'line': comment['position']
+            }]
         )
     except Exception as e:
         print(f"Failed to post comment: {str(e)}")

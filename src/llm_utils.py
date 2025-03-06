@@ -57,15 +57,9 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
     return comments
 
 def parse_llm_response(response: str, valid_lines: List[tuple], file_path: str) -> List[Dict]:
-    """
-    Parse LLM response into GitHub comment format
-    """
     comments = []
     line_pattern = re.compile(r'Line\s+(\d+):\s*(.+)')
-
-    # Remove 'b/' prefix from path
-    clean_path = file_path.lstrip('b/')
-
+    
     for match in line_pattern.findall(response):
         line_num_str, comment_text = match
         try:
@@ -73,10 +67,9 @@ def parse_llm_response(response: str, valid_lines: List[tuple], file_path: str) 
             if any(line_num == pos for pos, _ in valid_lines):
                 comments.append({
                     'body': f"🤖 AI Review: {comment_text}",
-                    'path': clean_path,
-                    'position': line_num
+                    'path': file_path.lstrip('b/'),
+                    'position': line_num  # This is actually the line number in the file
                 })
         except ValueError:
             continue
-
     return comments

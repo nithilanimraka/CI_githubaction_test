@@ -10,10 +10,19 @@ class AICodeReviewer:
         diff_content, head_commit_sha, pr = get_pull_request_diff()
         review_comments = analyze_code_changes(diff_content)
         
-        for comment in review_comments:
-            post_review_comment(comment, pr)
-            print(f"Posted comment for {comment['path']} line {comment['position']}")
-
-if __name__ == '__main__':
-    reviewer = AICodeReviewer()
-    reviewer.review_pull_request()
+        # Post all comments in a single review
+        if review_comments:
+            try:
+                pr.create_review(
+                    commit=pr.get_commits().reversed[0],
+                    body="🤖 AI Code Review Report",
+                    event="COMMENT",
+                    comments=[{
+                        'path': c['path'],
+                        'body': c['body'],
+                        'line': c['position']
+                    } for c in review_comments]
+                )
+                print(f"Successfully posted {len(review_comments)} comments")
+            except Exception as e:
+                print(f"Failed to post review: {str(e)}")
