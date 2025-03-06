@@ -25,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install --upgrade PyGithub google-genai requests python-dotenv
+          pip install --upgrade PyGithub google-genai requests python-dotenv unidiff
 
       - name: Run AI Code Review
         env:
