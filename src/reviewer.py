@@ -26,3 +26,7 @@ class AICodeReviewer:
                 print(f"Successfully posted {len(review_comments)} comments")
             except Exception as e:
                 print(f"Failed to post review: {str(e)}")
+
+if __name__ == '__main__':
+    reviewer = AICodeReviewer()
+    reviewer.review_pull_request()
