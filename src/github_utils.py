@@ -21,13 +21,14 @@ def get_pull_request_diff():
         pr.head.sha,
         pr
     )
+# commit=repo.get_commit(head_sha),
 
 def post_review_comment(comment: Dict, pull_request):
     """Post comment using GitHub API"""
     try:
         pull_request.create_review_comment(
             body=comment['body'],
-            commit_id=comment['commit_id'],
+            commit=comment['commit_id'],
             path=comment['path'],
             position=comment['position']
         )
