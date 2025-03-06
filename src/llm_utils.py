@@ -68,7 +68,7 @@ def analyze_code_changes(diff_content: str) -> List[Dict]:
             model="gemini-2.0-flash", contents=prompt
         )   
 
-        #print(response.text)
+        print(response.text)
         
         # Parse and format the response
         review_comments = parse_llm_response(response.text)
