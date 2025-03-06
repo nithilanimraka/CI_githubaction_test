@@ -125,7 +125,7 @@ def parse_llm_response(response: str) -> List[Dict]:
             comment['path'],
             isinstance(comment['start_line'], int),
             isinstance(comment['end_line'], int),
-            comment['start_line'] <= comment['end_line']
+            # comment['start_line'] <= comment['end_line']
         ]):
             valid = False
 
