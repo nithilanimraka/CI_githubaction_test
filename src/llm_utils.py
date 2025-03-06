@@ -105,9 +105,7 @@ def parse_llm_response(response: str) -> List[Dict]:
                 try:
                     parts = line.split('LINES:', 1)[-1].strip().split('-')
                     start = int(parts[0])
-                    print(start)
                     end = int(parts[1])
-                    print(end)
                     comment['start_line'], comment['end_line'] = sorted([start, end])
                 except (ValueError, IndexError):
                     valid = False

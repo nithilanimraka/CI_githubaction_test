@@ -107,7 +107,8 @@ def post_review_comment(comments, diff_content):
         print("No valid comments after final validation")
         return
 
-    print("Came near pr create review")
+    for a in valid_comments:
+        print(a)
     try:
         # Create review with valid comments
         review = pr.create_review(
