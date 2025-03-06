@@ -7,7 +7,7 @@ from google.genai import types
 from google import genai
 from unidiff import PatchSet
 
-def analyze_code_changes(diff_content: str, head_commit_sha: str) -> List[Dict]:
+def analyze_code_changes(diff_content: str) -> List[Dict]:
     """
     Analyze code changes using Gemini model with proper diff parsing
     Returns structured review comments with positions
@@ -50,7 +50,7 @@ def analyze_code_changes(diff_content: str, head_commit_sha: str) -> List[Dict]:
                     model="gemini-2.0-flash",
                     contents=prompt
                 )
-                comments += parse_llm_response(response.text, added_lines, file_path, head_commit_sha)
+                comments += parse_llm_response(response.text, added_lines, file_path)
             except Exception as e:
                 print(f"Error processing hunk: {str(e)}")
 
