@@ -26,11 +26,11 @@ def get_pull_request_diff():
 def post_review_comment(comment: Dict, pull_request):
     """Post comment using GitHub API"""
     try:
-        pull_request.create_review_comment(
+        pull_request.create_review(
             body=comment['body'],
             commit=comment['commit_id'],
             path=comment['path'],
-            event = 'COMMENT'
+            event="COMMENT"
         )
     except Exception as e:
         print(f"Failed to post comment: {str(e)}")
