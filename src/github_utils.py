@@ -55,7 +55,7 @@ def get_valid_hunks(diff_content: str) -> List[dict]:
             elif line.startswith(' '):
                 new_line += 1
 
-    print(hunks)            
+    # print(hunks)            
     return hunks
 
 def validate_comment(comment: dict, hunks: List[dict]) -> Optional[dict]:
@@ -107,6 +107,7 @@ def post_review_comment(comments, diff_content):
         print("No valid comments after final validation")
         return
 
+    print("Came near pr create review")
     try:
         # Create review with valid comments
         review = pr.create_review(
