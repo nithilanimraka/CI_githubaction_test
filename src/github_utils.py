@@ -119,5 +119,5 @@ def post_review_comment(comments, diff_content):
         print(f"Failed to post comments: {str(e)}")
         if hasattr(e, 'data'):
             print("Error details:", json.dumps(e.data, indent=2))
-    else:
-        print("No valid comments to post")
+        else:
+            print("No valid comments to post")
