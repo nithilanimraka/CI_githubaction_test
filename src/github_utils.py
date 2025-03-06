@@ -9,7 +9,7 @@ from typing import Dict
 
 def get_pull_request_diff():
     """Fetch diff content and PR metadata"""
-    g = Github(os.getenv('GITHUB_TOKEN'))
+    g = Github(os.getenv('GIT_TOKEN'))
     
     with open(os.getenv('GITHUB_EVENT_PATH'), 'r') as f:
         event_data = json.load(f)

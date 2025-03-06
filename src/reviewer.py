@@ -4,7 +4,7 @@ from llm_utils import analyze_code_changes
 
 class AICodeReviewer:
     def __init__(self):
-        self.github_token = os.getenv('GITHUB_TOKEN')
+        self.github_token = os.getenv('GIT_TOKEN')
 
     def review_pull_request(self):
         diff_content, head_commit_sha, pr = get_pull_request_diff()
