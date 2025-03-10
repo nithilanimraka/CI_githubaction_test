@@ -23,11 +23,8 @@ class AICodeReviewer:
                 return
 
 
-            # Post all comments in a single batch
-            if review_comments:
-                post_review_comment(review_comments, diff_content)
-            else:
-                print("No valid review comments generated")
+            print(f"Generated {len(review_comments)} potential comments")
+            post_review_comment(review_comments, diff_content)
 
         except Exception as e:
             print(f"Review failed: {str(e)}")
